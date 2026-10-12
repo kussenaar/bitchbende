@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react'
 
-export type IconName = 'arrow' | 'copy' | 'check' | 'close' | 'help' | 'sound' | 'muted' | 'shuffle' | 'eye' | 'swap' | 'draw' | 'flag' | 'chevron' | 'users' | 'sparkles' | 'trophy' | 'home' | 'play'
+export type IconName = 'arrow' | 'copy' | 'share' | 'check' | 'close' | 'help' | 'sound' | 'muted' | 'shuffle' | 'eye' | 'swap' | 'draw' | 'flag' | 'chevron' | 'users' | 'sparkles' | 'trophy' | 'home' | 'play'
 
 const paths: Record<IconName, ReactNode> = {
   arrow: <path d="M4 12h15M13 6l6 6-6 6" />,
   copy: <><rect x="8" y="8" width="12" height="13" rx="2" /><path d="M15 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3" /></>,
+  share: <path d="M12 15V3m-4 4 4-4 4 4M8 11H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-3" />,
   check: <path d="m5 12 4 4L19 6" />,
   close: <path d="m6 6 12 12M18 6 6 18" />,
   help: <><circle cx="12" cy="12" r="9" /><path d="M9.6 8.3a2.6 2.6 0 0 1 5 1c0 1.9-2.6 2.2-2.6 4M12 16.5v.1" /></>,

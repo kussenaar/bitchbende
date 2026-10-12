@@ -42,6 +42,7 @@ export function OnlineRoom({ onBack, onRules, renderGame }: OnlineRoomProps) {
   const [connectionError, setConnectionError] = useState('')
   const [retry, setRetry] = useState(0)
   const [copied, setCopied] = useState(false)
+  const [sharing, setSharing] = useState(false)
   const [copyFallback, setCopyFallback] = useState(false)
   const [forgetting, setForgetting] = useState(false)
   const credentialsRef = useRef(credentials)
@@ -231,12 +232,28 @@ export function OnlineRoom({ onBack, onRules, renderGame }: OnlineRoomProps) {
     catch { setCopyFallback(true); inviteInput.current?.focus(); inviteInput.current?.select(); setError('Select and copy the invite link below.') }
   }
 
+  async function shareInvite() {
+    if (!room || sharing) return
+    if (!navigator.share) { await copyInvite(); return }
+    setSharing(true)
+    try {
+      await navigator.share({
+        title: 'Bitchbende',
+        text: `Join my Bitchbende room (${room.code}).`,
+        url: getInviteLink(room.code),
+      })
+    } catch (shareError) {
+      // Dismissing the device's share menu should leave the room untouched.
+      if (!(shareError instanceof Error && shareError.name === 'AbortError')) await copyInvite()
+    } finally { setSharing(false) }
+  }
+
   const status = <div className={`room-status${connection === 'offline' ? ' connection-offline' : ''}`} role="status"><span className="status-dot" /><span>{connection === 'online' ? 'Connected' : connection === 'connecting' ? 'Connecting…' : 'Connection lost · retrying automatically'}</span>{connection !== 'online' && <button className="text-button" type="button" onClick={() => setRetry((value) => value + 1)}>Retry now</button>}</div>
   const forgetControl = <>{forgetting ? <div className="notice"><p>Forgetting this room removes your saved seat. You cannot recover a hand already in play without it.</p><div className="room-actions"><button className="button button-secondary" type="button" onClick={() => setForgetting(false)}>Keep room</button><button className="button button-secondary" type="button" onClick={forgetRoom}>Forget room</button></div></div> : <button className="text-button" type="button" onClick={() => setForgetting(true)}>Forget saved room</button>}</>
   function backFromGame() { if (room?.status === 'finished') forgetRoom(); onBack() }
 
   if (room?.game && session) return <>
-    <div className="online-statusbar"><span>Room <strong>{room.code}</strong> · {room.players.length} players</span>{status}<button className="text-button" type="button" onClick={() => { void copyInvite() }}><Icon name={copied ? 'check' : 'copy'} size={15} /> {copied ? 'Copied' : 'Copy invite'}</button><button className="text-button" type="button" onClick={backFromGame}>Back to menu</button>{room.status === 'finished' ? <button className="text-button" type="button" onClick={forgetRoom}>Leave finished room</button> : forgetControl}</div>
+    <div className="online-statusbar"><span>Room <strong>{room.code}</strong> · {room.players.length} players</span>{status}<button className="text-button" type="button" onClick={() => { void copyInvite() }}><Icon name={copied ? 'check' : 'copy'} size={15} /> {copied ? 'Copied' : 'Copy invite'}</button><button className="text-button" type="button" disabled={sharing} onClick={() => { void shareInvite() }}><Icon name="share" size={15} /> {sharing ? 'Sharing…' : 'Share link'}</button><button className="text-button" type="button" onClick={backFromGame}>Back to menu</button>{room.status === 'finished' ? <button className="text-button" type="button" onClick={forgetRoom}>Leave finished room</button> : forgetControl}</div>
     {copyFallback && <div className="online-connection-notice"><input ref={inviteInput} className="field-input" aria-label="Invite link" readOnly value={getInviteLink(room.code)} onFocus={(event) => event.target.select()} /></div>}
     {connectionError && <div className="online-connection-notice notice error-notice" role="alert">{connectionError} Your seat and latest confirmed game are kept while reconnecting.</div>}
     {error && <div className="online-connection-notice notice error-notice" role="alert">{error}</div>}
@@ -251,7 +268,7 @@ export function OnlineRoom({ onBack, onRules, renderGame }: OnlineRoomProps) {
       <p className="form-subtitle">{room ? 'Share the code or link with your friends.' : 'Restoring the seat saved on this browser.'}</p>
       <div className="room-code" aria-label={`Room code ${credentials.code}`}>{credentials.code}</div>
       {room && <>
-        <div className="room-invite"><input ref={inviteInput} className="field-input" aria-label="Invite link" readOnly value={getInviteLink(room.code)} onFocus={(event) => event.target.select()} /><button className="button button-secondary" type="button" onClick={() => { void copyInvite() }}><Icon name={copied ? 'check' : 'copy'} size={16} /> {copied ? 'Copied' : 'Copy link'}</button></div>
+        <div className="room-invite"><input ref={inviteInput} className="field-input" aria-label="Invite link" readOnly value={getInviteLink(room.code)} onFocus={(event) => event.target.select()} /><button className="button button-secondary" type="button" onClick={() => { void copyInvite() }}><Icon name={copied ? 'check' : 'copy'} size={16} /> {copied ? 'Copied' : 'Copy link'}</button><button className="button button-secondary" type="button" disabled={sharing} onClick={() => { void shareInvite() }}><Icon name="share" size={16} /> {sharing ? 'Sharing…' : 'Share link'}</button></div>
         <div className="seat-list"><div className="seat-list-heading"><span>PLAYERS</span><span>{room.players.length} / 4 seats · {room.rounds} rounds</span></div>{room.players.map((player, index) => <div className="bot-seat" key={player.id}><span className={`avatar avatar-${COLORS[index]}`}>{player.name[0]?.toUpperCase() || '?'}</span><span>{player.name}</span><span className="seat-type">{player.id === room.hostId ? 'Host' : player.id === credentials.playerId ? 'You' : 'Player'}</span><span className="seat-ready"><Icon name="check" size={15} /></span></div>)}{Array.from({ length: 4 - room.players.length }, (_, index) => <div className="bot-seat room-seat-empty" key={`empty-${index}`}><span className="avatar"><Icon name="users" size={16} /></span><span>Open seat</span><span className="seat-type">Invite a friend</span></div>)}</div>
         {room.hostId === credentials.playerId ? <><button className="button button-primary start-button" type="button" disabled={busy || connection !== 'online' || room.players.length < 2} onClick={() => { void mutate('start') }}>{busy ? 'Starting…' : 'Start game'}<Icon name="play" size={17} /></button><p className="local-note">{room.players.length < 2 ? 'At least one friend must join before you can start.' : `Start with ${room.players.length} players when everyone has joined. Players cannot join after the game starts.`}</p></> : <p className="notice">Waiting for {room.players.find((player) => player.id === room.hostId)?.name || 'the host'} to start the game. Keep this page open.</p>}
         <div className="room-actions"><button className="text-button" type="button" disabled={busy || connection !== 'online'} onClick={() => { void mutate('leave') }}>Leave room</button><button className="text-button" type="button" onClick={onRules}>How to play <Icon name="help" size={15} /></button></div>

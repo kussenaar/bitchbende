@@ -893,7 +893,7 @@ button.card:enabled:active { transform: translateY(-2px); }
   .room-lobby { padding: 21px; }
   .room-invite { flex-wrap: wrap; }
   .room-invite input { flex-basis: 100%; }
-  .room-invite .button { width: 100%; }
+  .room-invite .button { flex: 1 1 calc(50% - 4px); min-height: 44px; }
   .online-statusbar, .online-connection-notice { width: calc(100% - 28px); }
   .online-statusbar { margin-bottom: 0; }
   .final-round-banner { padding: 12px; gap: 9px; }
