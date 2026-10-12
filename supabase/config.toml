@@ -1,0 +1,8 @@
+project_id = "bitchbende"
+
+[functions.game]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/game/index.ts"
+# Players authenticate with a private room-seat token checked by the handler.
+# Creating or joining a lobby is intentionally available without an account.

@@ -1,0 +1,94 @@
+Source: /Users/lieve/Downloads/spelregels-beverbende.pdf
+Extraction: PDF text streams using Python standard library (no OCR).
+
+--- PAGE 1 ---
+Nederlandstalige Spelregels Beverbende
+Doel van het spel:
+Aan het einde van het spel de laagste score hebben.
+Opstelling:
+Kies één van de spelers als deler. De oudste speler kan de score bijhouden. Deze speler noteert de
+score van elke speler aan het einde van elke spelronde.
+Schud de kaarten. De speler links van de deler pakt af. De deler geeft elke speler afwisselend in totaal
+4 gedekte kaarten. De overblijvende kaarten vormen een gedekte trekstapel in het midden van de
+tafel. De bovenste kaart wordt omgedraaid en vormt de start van de aflegstapel. Als die kaart een
+Kracht-kaart is, wordt ze terug in de stapel geschud en wordt er een andere kaart omgedraaid.
+Zonder te kijken vormt elke speler met de 4 gedekte kaarten een horizontale rij voor zich.
+De tafel ziet er dan als volgt uit:
+
+Spel
+Tijdens het spel zal elke speler altijd 4 gedekte kaarten voor zich hebben liggen. Bij het begin van het
+speler mag elke speler zijn 2 buitenste kaarten even bekijken en terug gedekt voor zich leggen. Elke
+speler weet nu dus de puntenwaarde van 2 van zijn 4 kaarten en zal deze ook moeten onthouden
+tijdens het spel.
+Als één of beide van de buitenste kaarten Kracht-kaarten zijn, mag de speler ze houden, maar ze
+hebben geen krachten (zoals verderop beschreven). Kracht-kaarten hebben immers enkel hun kracht
+als ze van de stapel (midden van de stapel) worden getrokken.
+De speler links van de deler heeft de eerste beurt en het spel vervolgt in klokwijzerzin.
+
+
+--- PAGE 2 ---
+Voor elke beurt, heeft een speler 2 alternatieven:
+1. Een (openliggende) kaart trekken van de aflegstapel. Deze kaart moet één van zijn 4 gedekte
+kaarten vervangen. De kaart die vervangen wordt, gaat dan ongedekt op de aflegstapel of
+2. Trek een kaart van de trekstapel. Een speler mag deze kaart gebruiken om:
+a. één van zijn kaarten te vervangen, of
+b. te spieken, wisselen of 2 te trekken als het een Kracht-kaart is (zie beneden), of
+c. ongedekt af te leggen op de aflegstapel
+De keuze van een speler is gebaseerd op het onthouden van zijn 4 gedekte kaarten. Hou goed bij wat
+welke 4 kaarten er voor je liggen zodat je niet per ongeluk een lage kaart vervangt.
+Als tijdens het spel de trekstapel op is, schud je de aflegstapel en vorm je een nieuwe trekstapel (met
+1 afgelegde ongedekte kaart die geen Kracht-kaart is).
+Kracht-kaarten:
+Kracht-kaarten hebben speciale krachten die je helpen tijdens het spel. Ze hebben enkel krachten als
+ze worden getrokken van de trekstapel. Als je een Kracht-kaart tijdens het delen in het begin van het
+spel, kan je de kaart niet gebruiken. Omdat Kracht-kaarten geen punten hebben, worden zij aan het
+einde van het spel – uiteraard als ze nog in je horizontale rij liggen – vervangen door een kaart
+getrokken van de trekstapel. Dit kan risicovol zijn. Het is daarom beter om deze kaarten snel in de
+ronde kwijt te raken. Als een Kracht-kaart wordt afgelegd op de aflegstapel, kan ze niet door een
+andere speler worden gebruikt.
+Er zijn 3 soorten Kracht-kaarten:
+Spiek:
+Als je een Spiek kaart trekt, laat je deze zien en mag je één keer spieken: één van je 4 gedekte
+kaarten bekijken. Je kan deze kaart dus gebruiken om één van je 2 middelste kaarten te bekijken om
+te weten te komen wat je daar in je rij hebt liggen. Je mag natuurlijk ook één van je 2 buitenste
+kaarten bekijken als je geheugen je even in de steek heeft gelaten. Na éénmaal spieken is je beurt
+voorbij en leg je de Spiek Kracht-kaart op de aflegstapel.
+Wissel
+Als je een Wissel kaart trekt, laat je deze zien en leg je deze op de aflegstapel. Je mag nu één van je
+kaarten wisselen met één kaart van een andere speler (maar je moet dit niet doen). Je mag beide
+kaarten niet bekijken. Na de wissel is je beurt voorbij.
+Trek 2
+Als je een Trek-2 kaart trekt, laat je deze zien en krijg je nog 2 beurten. Eerst trek je de volgende
+kaart van de stapel. Je moet nu beslissen of je deze kaart gaat gebruiken en de 2
+de
+ beurt opgeven of
+je legt deze kaart op de aflegstapel en je trekt een tweede kaart. Deze tweede kaart mag je nu
+gebruiken op afleggen op de aflegstapel. Je beurt is dan voorbij. Als één van de getrokken kaarten
+een nieuwe Trek-2 kaart is, begint de Trek-2 volgorde opnieuw.
+
+
+--- PAGE 3 ---
+Einde van de ronde
+Als een speler denkt dat hij de laagste score heeft en de ronde kan winnen, mag hij de ronde
+eindigen door op tafel te kloppen en te zeggen: “Beverbende” op het einde van zijn beurt. Als hij
+geklopt heeft, heeft elke andere speler nog één beurt. Elke speler toont zijn/haar kaarten. Spelers die
+Kracht-kaarten hebben liggen, trekken een kaart van de trekstapel ter vervanging van deze Kracht-
+kaart. Als iemand opnieuw een Kracht-kaart trekt, trekt die opnieuw (tot hij/zij geen Kracht-kaart
+meer trekt).
+Scoren
+Tel de punten van je 4 kaarten. Dit is de score voor deze ronde en wordt genoteerd. Het is dus de
+bedoeling om zo laag mogelijk te scoren!
+Volgende ronden
+Alle kaarten worden verzameld en opnieuw geschud door de volgende deler.
+Einde van het spel
+De speler met de laagste totale score is de winnaar.
+Een spel kan op 3 wijzen worden gespeeld:
+1. Speel een vooraf vastgesteld aantal ronden
+2. Speel een afgesproken tijdsduur
+3. Speel om in het spel te blijven en geen 100 punten te bereiken. Als een speler 100 punten
+bereikt, ligt deze uit het spel. De laatst overgebleven speler is de winnaar. Je kan natuurlijk
+een andere score afspreken (bvb. 200 of iets anders).
+Voor jongere spelers
+Als je met jonge kinderen speelt, laat je de 2 buitenste kaarten ongedekt liggen. Enkel de 2 binnenste
+kaarten kunnen dan gewisseld worden met een Wissel Kracht-kaart. Alle andere regels blijven
+hetzelfde.
