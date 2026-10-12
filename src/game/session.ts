@@ -1,4 +1,5 @@
 import { applyAction, chooseBotAction, createGame, getPlayerView, isGameState } from './engine.ts'
+import { cardMoveTiming } from './presentation.ts'
 import type { GameAction, GameState, GameView } from './types'
 
 export const LOCAL_PLAYER_ID = 'you'
@@ -62,8 +63,11 @@ export class LocalGameSession implements GameSession {
     const previousRevision = this.state.revision
     this.state = state
     this.snapshot = getPlayerView(state, this.viewerId)
-    if (state.log.some(entry => entry.move && entry.move.revision > previousRevision && ['replace', 'swap'].includes(entry.move.type))) {
-      this.presentationUntil = Date.now() + 2300
+    for (const { move } of state.log) {
+      if (move && move.revision > previousRevision && (move.type === 'replace' || move.type === 'swap')) {
+        const { flightMs, landingMs } = cardMoveTiming(move, this.viewerId)
+        this.presentationUntil = Math.max(this.presentationUntil, Date.now() + flightMs + landingMs + 300)
+      }
     }
     this.save()
     this.listeners.forEach((listener) => listener())

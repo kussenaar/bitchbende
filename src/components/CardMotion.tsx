@@ -1,6 +1,7 @@
 import { useId, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import type { Card as GameCard, GameView, PublicCardMove } from '../game/types'
+import { cardMoveTiming } from '../game/presentation'
 import { Card } from './Card'
 import './CardMotion.css'
 
@@ -13,12 +14,10 @@ type Geometry = { id: number; flights: Flight[]; hidden: HTMLElement[]; targets:
 
 type CardMotionProps = {
   view: GameView
+  viewerId: string
   tableRef: RefObject<HTMLDivElement | null>
   onAnimatingChange: (animating: boolean) => void
 }
-
-const FLIGHT_MS = 1500
-const LANDING_MS = 500
 
 function cardBox(element: HTMLElement): Box {
   const rect = (element.querySelector('.card') ?? element).getBoundingClientRect()
@@ -95,7 +94,7 @@ function measureMove(active: QueuedMove, table: HTMLElement, view: GameView): Ge
 }
 
 /** Animates only public moves. In particular, a blind swap never receives card faces. */
-export function CardMotion({ view, tableRef, onAnimatingChange }: CardMotionProps) {
+export function CardMotion({ view, viewerId, tableRef, onAnimatingChange }: CardMotionProps) {
   const cursor = useRef({ round: view.round, id: Math.max(0, ...view.log.map((entry) => entry.id)) })
   const [moves, setMoves] = useState<QueuedMove[]>([])
   const [geometry, setGeometry] = useState<Geometry | null>(null)
@@ -136,6 +135,7 @@ export function CardMotion({ view, tableRef, onAnimatingChange }: CardMotionProp
   useLayoutEffect(() => {
     if (!active || !geometry || geometry.id !== active.id) return
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const { flightMs, landingMs, reducedMs } = cardMoveTiming(active.move, viewerId)
     const animations: Animation[] = []
     let landingTimer: ReturnType<typeof setTimeout> | undefined
     let finishTimer: ReturnType<typeof setTimeout> | undefined
@@ -155,15 +155,15 @@ export function CardMotion({ view, tableRef, onAnimatingChange }: CardMotionProp
 
     if (reducedMotion) {
       land()
-      finishTimer = setTimeout(finish, 900)
+      finishTimer = setTimeout(finish, reducedMs)
     } else {
       geometry.hidden.forEach((element) => element.classList.add('card-motion-hidden'))
       geometry.flights.forEach((flight, index) => {
         const element = flyingCards.current[index]
-        if (element) animations.push(element.animate(flightKeyframes(flight), { duration: FLIGHT_MS, easing: 'cubic-bezier(.32, 0, .32, 1)', fill: 'forwards' }))
+        if (element) animations.push(element.animate(flightKeyframes(flight), { duration: flightMs, easing: 'cubic-bezier(.32, 0, .32, 1)', fill: 'forwards' }))
       })
-      landingTimer = setTimeout(land, FLIGHT_MS)
-      finishTimer = setTimeout(finish, FLIGHT_MS + LANDING_MS)
+      landingTimer = setTimeout(land, flightMs)
+      finishTimer = setTimeout(finish, flightMs + landingMs)
     }
 
     const handleScroll = (event: Event) => {
@@ -190,7 +190,7 @@ export function CardMotion({ view, tableRef, onAnimatingChange }: CardMotionProp
       window.removeEventListener('scroll', handleScroll, true)
       viewport?.removeEventListener('resize', handleViewportResize)
     }
-  }, [active, geometry])
+  }, [active, geometry, viewerId])
 
   if (!active || !geometry || geometry.id !== active.id) return null
 
