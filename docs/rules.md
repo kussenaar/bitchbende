@@ -5,7 +5,7 @@ Primary source: the user-provided [`spelregels-beverbende.pdf`](/Users/lieve/Dow
 ## Implemented rules checklist
 
 - Deal four cards, one at a time, clockwise from the dealer's left. Place them in a horizontal row.
-- Start the discard pile with a number card, shuffling an opening power back into the deck.
+- Start each round with an empty discard pile. The first player draws from the deck. This follows the user's requested rule and overrides the PDF's opening face-up card.
 - Each player privately looks at the two outer cards once, then covers them. Other cards stay hidden; this is a memory game.
 - The dealer's left neighbor starts. Turns proceed clockwise.
 - Whenever a drawn card replaces one of your four cards, put the replaced card face up on top of the discard pile, visible to everyone. The next player can take that exact card if it is a number, or draw from the face-down deck instead.

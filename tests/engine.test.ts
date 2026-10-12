@@ -3,6 +3,7 @@ import test from 'node:test'
 import { applyAction, chooseBotAction, createDeck, createGame, getPlayerView, isGameState } from '../src/game/engine.ts'
 import type { CardShuffler } from '../src/game/engine.ts'
 import { createLocalSession, restoreLocalSession } from '../src/game/session.ts'
+import { COMPUTERS } from '../src/game/computers.ts'
 import type { Card, GameAction, GameState } from '../src/game/types.ts'
 
 const players = [
@@ -79,12 +80,31 @@ test('dealing is reproducible, preserves every card, and starts to the dealer’
   assert.equal(first.phase, 'initial')
   assert.equal(first.dealerIndex, 0)
   assert.equal(first.turnIndex, 1)
-  assert.equal(first.deck.length, 49)
-  assert.equal(first.discard.length, 1)
-  assert.equal(first.discard[0].kind, 'number')
+  assert.equal(first.deck.length, 50)
+  assert.deepEqual(first.discard, [])
   assert.ok(first.players.every((player) => player.hand.length === 4))
   const dealtCards = [...first.deck, ...first.discard, ...first.players.flatMap((player) => player.hand)]
   assert.deepEqual(dealtCards.map((card) => card.id).sort(), createDeck().map((card) => card.id).sort())
+})
+
+test('two-to-four-player rounds start with no discard and require a deck draw', () => {
+  for (const count of [2, 3, 4]) {
+    let state = createGame(players.slice(0, count), { seed: 123 })
+    assert.equal(state.deck.length, 66 - count * 4)
+    for (const player of state.players) {
+      assert.equal(getPlayerView(state, player.id).discard, null)
+      state = command(state, { type: 'ready' }, player.id)
+    }
+    rejected(state, { type: 'draw', source: 'discard' })
+    assert.deepEqual(chooseBotAction(state, state.players[state.turnIndex].id), { type: 'draw', source: 'deck' })
+    const top = state.deck.at(-1)!
+    state = command(state, { type: 'draw', source: 'deck' })
+    assert.deepEqual(state.discard, [])
+    assert.deepEqual(state.drawn, top)
+    state = command(state, { type: 'discard' })
+    for (const player of state.players) assert.deepEqual(getPlayerView(state, player.id).discard, top)
+    assert.equal(isGameState(state), true)
+  }
 })
 
 test('initial outer-card viewing is private and disappears as each player becomes ready', () => {
@@ -520,18 +540,18 @@ test('exhausted deck is recycled while retaining a numeric face-up discard', () 
   assert.deepEqual([...state.deck, state.drawn!].map((card) => card.id).sort(), recyclable.map((card) => card.id).sort())
 })
 
-test('trusted shuffle injection handles initial dealing, rejected opening powers, and the next round', () => {
+test('trusted shuffle injection deals once without an opening discard and is reused for the next round', () => {
   let calls = 0
   const injected: CardShuffler = (cards) => {
     calls++
-    // The first order deals powers and leaves a power on top; the opening-card
-    // retry must use this provider too, rather than the seeded local generator.
-    return calls === 1 ? [...cards] : cards.toSorted((a, b) => Number(a.kind === 'number') - Number(b.kind === 'number'))
+    // Keep powers on top to prove dealing does not search for an opening number.
+    return [...cards]
   }
   let state = createGame(players, { seed: 123, rounds: 2, shuffle: injected })
-  assert.equal(calls, 2)
+  assert.equal(calls, 1)
   assert.equal(state.rng, 123, 'Injected shuffling must not fall back to the seeded PRNG')
-  assert.equal(state.discard.at(-1)?.kind, 'number')
+  assert.deepEqual(state.discard, [])
+  assert.notEqual(state.deck.at(-1)?.kind, 'number')
   for (const player of players) state = command(state, { type: 'ready' }, player.id, injected)
   state = command(state, { type: 'draw', source: 'deck' }, 'b', injected)
   state = command(state, { type: 'discard' }, 'b', injected)
@@ -543,7 +563,9 @@ test('trusted shuffle injection handles initial dealing, rejected opening powers
   }
   assert.equal(state.phase, 'round-over')
   state = command(state, { type: 'next-round' }, 'a', injected)
-  assert.equal(calls, 3)
+  assert.equal(calls, 2)
+  assert.deepEqual(state.discard, [])
+  assert.equal(state.deck.length, 50)
   assert.equal(state.rng, 123)
   assert.equal(isGameState(state), true)
 })
@@ -718,6 +740,81 @@ test('bots trade their worst card for an observed low card and skip weak swaps',
   assert.deepEqual(chooseBotAction(state, 'b'), { type: 'discard' })
 })
 
+test('computer personalities vary close decisions while always keeping low cards and large improvements', () => {
+  const state = createGame([{ id: 'you', name: 'You' }, ...COMPUTERS.map(({ id, name }) => ({ id, name }))], { seed: 123 })
+  state.phase = 'choose'
+  state.drawnSource = 'deck'
+  const skipped: number[] = []
+  const samples = 256
+  for (const [index, computer] of COMPUTERS.entries()) {
+    state.turnIndex = index + 1
+    const id = computer.id
+    state.knowledge[id][id] = [number(0), number(1), number(2), number(9)]
+    state.drawn = number(8)
+    let passes = 0
+    for (let turn = 0; turn < samples; turn++) {
+      state.turnNumber = 1 + turn * 4
+      const before = structuredClone(state)
+      const action = chooseBotAction(state, id)
+      assert.ok(action?.type === 'discard' || (action?.type === 'replace' && action.slot === 3))
+      if (action.type === 'discard') passes++
+      assert.deepEqual(chooseBotAction(state, id), action)
+      assert.deepEqual(state, before, 'Strategy must not mutate game state or RNG')
+    }
+    assert.ok(passes > 0 && passes < samples, `${computer.name} should sometimes take a small gain and sometimes pass`)
+    skipped.push(passes)
+    for (const value of [0, 1, 2, 3, 4, 5]) {
+      state.drawn = number(value)
+      assert.deepEqual(chooseBotAction(state, id), { type: 'replace', slot: 3 }, 'Always keep low cards and substantial improvements')
+    }
+    state.knowledge[id][id] = [number(0), number(1), number(2), number(3)]
+    state.drawn = number(8)
+    assert.deepEqual(chooseBotAction(state, id), { type: 'discard' }, 'Variation must never replace a remembered low card with a worse one')
+  }
+  assert.ok(skipped[0] < skipped[1] && skipped[1] < skipped[2], `Lisa accepts small gains more reliably than Chanah and Clara: ${skipped}`)
+})
+
+test('bots vary equivalent card choices and compare Draw Two against the expected second draw', () => {
+  const state = readyGame()
+  state.knowledge.b.b = [number(0), null, null, number(1)]
+  state.phase = 'peek-target'
+  const choices = new Set<number>()
+  for (let turn = 1; turn <= 64; turn++) {
+    state.turnNumber = turn
+    const action = chooseBotAction(state, 'b')
+    assert.equal(action?.type, 'peek')
+    if (action?.type === 'peek') choices.add(action.slot)
+  }
+  assert.deepEqual([...choices].sort(), [1, 2], 'Peeks should not always choose the first unknown slot')
+  state.phase = 'choose'
+  state.drawnSource = 'deck'
+  state.drawsRemaining = 1
+  state.drawn = number(5)
+  state.knowledge.b.b = [number(0), number(1), number(2), number(8)]
+  assert.deepEqual(chooseBotAction(state, 'b'), { type: 'replace', slot: 3 }, 'Lisa accepts a solid three-point improvement')
+  state.turnIndex = 3
+  state.knowledge.d.d = [number(0), number(1), number(2), number(8)]
+  assert.deepEqual(chooseBotAction(state, 'd'), { type: 'discard' }, 'Clara is more willing to try the second draw')
+})
+
+test('bots take guaranteed improvements on their final turn instead of passing them at random', () => {
+  const state = readyGame()
+  state.knockedBy = 'a'
+  state.knowledge.b.b = [number(0), number(1), number(2), number(9)]
+  state.discard = [number(8)]
+  for (let turn = 1; turn <= 64; turn++) {
+    state.turnNumber = turn
+    assert.deepEqual(chooseBotAction(state, 'b'), { type: 'draw', source: 'discard' })
+    state.phase = 'choose'
+    state.drawnSource = 'deck'
+    state.drawn = number(8)
+    assert.deepEqual(chooseBotAction(state, 'b'), { type: 'replace', slot: 3 })
+    state.phase = 'draw'
+    state.drawn = null
+    state.drawnSource = null
+  }
+})
+
 test('bots call with a strong hand but respect observed opponents and ties', () => {
   const state = readyGame()
   state.phase = 'end-turn'
@@ -863,6 +960,7 @@ test('local sessions support one, two, or three computers and restore every tabl
       const session = createLocalSession('Ada', 3, botCount)
       assert.equal(session.mode, 'local')
       assert.equal(session.getSnapshot().players.length, botCount + 1)
+      assert.deepEqual(session.getSnapshot().players.slice(1).map((player) => player.name), ['Lisa', 'Chanah', 'Clara'].slice(0, botCount))
       assert.equal(restoreLocalSession()?.getSnapshot().players.length, botCount + 1)
     }
     assert.equal(createLocalSession('Ada', 3).getSnapshot().players.length, 4)

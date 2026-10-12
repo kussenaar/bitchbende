@@ -3,8 +3,9 @@ import type { FormEvent } from 'react'
 import { Beaver } from './Beaver'
 import { Card } from './Card'
 import { Icon } from './Icon'
+import { COMPUTERS } from '../game/computers'
 
-const BOT_NAMES = ['Milo', 'Luna', 'Noor']
+const BOT_NAMES = COMPUTERS.map((computer) => computer.name)
 const COLORS = ['coral', 'gold', 'lavender', 'sage']
 
 interface StartLobbyProps {

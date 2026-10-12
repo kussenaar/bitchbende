@@ -49,7 +49,7 @@ test('public views sanitize legacy persisted history without changing the save o
     const view = getPlayerView(state, viewerId)
     assert.equal(view.log.at(-2)?.text, 'Player 9 replaced a card.')
     assert.equal(view.log.at(-1)?.text, 'Sam 4 swapped a card with Player 9.')
-    assert.deepEqual(view.discard, state.discard.at(-1))
+    assert.deepEqual(view.discard, state.discard.at(-1) ?? null)
   }
   assert.deepEqual(state, before)
 })

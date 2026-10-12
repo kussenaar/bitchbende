@@ -6,6 +6,8 @@ React, TypeScript, and Vite card game for **2–4 players**. Play against one to
 
 Computers call Bitchbende only after remembering all four number cards with a total under 10. They call promptly with strong hands and sometimes wait for another improvement at 7–9 points, while considering what they know about opponents.
 
+The computers are Lisa, Chanah, and Clara. Lisa favors safer gains, Chanah balances caution and risk, and Clara gambles more. They vary close decisions, choose between equally useful cards, and compare Draw Two improvements with the expected second draw. They only use information they have observed.
+
 ## Local play
 
 Use Node.js 24 or newer:
@@ -17,7 +19,7 @@ npm run dev
 
 One command starts Vite and the local room server. Open the printed URL. Choose the number of computers, or select **Create or join a room**. To test friends on one computer, use separate browser profiles or private windows. Local rooms are held in memory and disappear when the server stops. Computer matches and online seat credentials survive a page refresh.
 
-Memorize your outside cards, then hide them. Draw or take the face-up numeric discard. Click a hand card to replace, peek, or swap. Call Bitchbende after your move to give everyone else one final turn. The call triggers a large visual alarm and a short siren; sound can be muted in the header. Reduced-motion settings disable the blinking and movement.
+Every round starts with an empty discard pile, so the first player draws from the deck. Memorize your outside cards, then hide them. Draw or take the face-up numeric discard once one exists. Click a hand card to replace, peek, or swap. Call Bitchbende after your move to give everyone else one final turn. The call triggers a large visual alarm and a short siren; sound can be muted in the header. Reduced-motion settings disable the blinking and movement.
 
 Replacements and swaps animate between numbered card positions, with a brief pause before computers continue. Blind swaps stay face down. Position numbers remain visible when choosing a swap, including on phones.
 

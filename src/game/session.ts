@@ -1,5 +1,6 @@
 import { applyAction, chooseBotAction, createGame, getPlayerView, isGameState } from './engine.ts'
 import { cardMoveTiming } from './presentation.ts'
+import { COMPUTERS } from './computers.ts'
 import type { GameAction, GameState, GameView } from './types'
 
 export const LOCAL_PLAYER_ID = 'you'
@@ -95,11 +96,7 @@ export class LocalGameSession implements GameSession {
 export function createLocalSession(name: string, rounds: number, botCount = 3): LocalGameSession {
   if (!Number.isInteger(botCount) || botCount < 1 || botCount > 3) throw new Error('Choose 1 to 3 computer opponents.')
   const seed = crypto.getRandomValues(new Uint32Array(1))[0]
-  const computers = [
-    { id: 'milo', name: 'Milo' },
-    { id: 'luna', name: 'Luna' },
-    { id: 'noor', name: 'Noor' },
-  ].slice(0, botCount)
+  const computers = COMPUTERS.slice(0, botCount).map(({ id, name }) => ({ id, name }))
   const session = new LocalGameSession(createGame([
     { id: LOCAL_PLAYER_ID, name: name.trim().slice(0, 20) || 'You' },
     ...computers,

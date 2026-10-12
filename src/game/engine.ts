@@ -1,5 +1,6 @@
 import type { ActionResult, Card, GameAction, GameLog, GameState, GameView, PublicCardMove, RoundResult } from './types.ts'
 import { activityText } from './activity.ts'
+import { COMPUTERS } from './computers.ts'
 
 export type { Card, GameAction, GamePhase, GameState, GameView, PlayerView, PublicCardMove, RoundResult } from './types.ts'
 
@@ -81,9 +82,7 @@ function dealRound(state: GameState, shuffleCards?: CardShuffler): void {
       player.hand.push(state.deck.pop()!)
     }
   }
-  // The supplied rules require an opening number. Re-shuffle rejected powers.
-  while (state.deck[state.deck.length - 1].kind !== 'number') state.deck = shuffle(state, state.deck, shuffleCards)
-  state.discard.push(state.deck.pop()!)
+  // This version starts each round with an empty discard pile.
   for (const player of state.players) {
     setKnown(state, player.id, player.id, 0, player.hand[0])
     setKnown(state, player.id, player.id, 3, player.hand[3])
@@ -591,14 +590,24 @@ function scoreProbabilities(hand: (Card | null)[], unseen: number[]): number[] {
 }
 
 /** Stable variation per turn, using public facts instead of the hidden shuffle RNG. */
-function botCallRoll(state: GameState, actorId: string): number {
+function stableRoll(key: string): number {
   let hash = 2166136261
-  for (const character of `${actorId}:${state.round}:${state.turnNumber}`) {
+  for (const character of key) {
     hash = Math.imul(hash ^ character.charCodeAt(0), 16777619)
   }
   hash = Math.imul(hash ^ (hash >>> 16), 0x85ebca6b)
   hash = Math.imul(hash ^ (hash >>> 13), 0xc2b2ae35)
   return ((hash ^ (hash >>> 16)) >>> 0) / 4294967296
+}
+
+function botCallRoll(state: GameState, actorId: string): number {
+  return stableRoll(`${actorId}:${state.round}:${state.turnNumber}`)
+}
+
+/** Variation uses observed cards, never hidden hands, deck order or shuffle RNG. */
+function botChoiceRoll(state: GameState, actorId: string, decision: string): number {
+  const observed = state.knowledge[actorId][actorId].map((card) => card?.id ?? '?').join(',')
+  return stableRoll(`${actorId}:${state.round}:${state.turnNumber}:${decision}:${observed}:${state.drawn?.id ?? ''}`)
 }
 
 /** Bot strategy reads only its own observed knowledge and its own drawn card. */
@@ -609,20 +618,27 @@ export function chooseBotAction(state: GameState, actorId: string): GameAction |
   if (state.players[state.turnIndex].id !== actorId) return null
   const memory = state.knowledge[actorId]
   const own = memory[actorId]
+  const playerIndex = state.players.indexOf(player)
+  const style = (COMPUTERS.find((computer) => computer.id === actorId) ?? COMPUTERS[Math.max(0, playerIndex - 1) % COMPUTERS.length]).style
+  const roll = (decision: string) => botChoiceRoll(state, actorId, decision)
   const unseen = unseenNumberProbabilities(state, actorId)
   const unseenMean = unseen.reduce((sum, chance, value) => sum + chance * value, 0)
-  const worstSlot = own.reduce((best, card, slot) => exchangeValue(card, unseenMean) > exchangeValue(own[best], unseenMean) ? slot : best, 0)
-  const worstValue = exchangeValue(own[worstSlot], unseenMean)
+  const worstValue = Math.max(...own.map((card) => exchangeValue(card, unseenMean)))
+  const worstSlots = own.map((_, slot) => slot).filter((slot) => exchangeValue(own[slot], unseenMean) === worstValue)
+  const worstSlot = worstSlots[Math.floor(roll('replace-slot') * worstSlots.length)]
   const helpfulSwap = (): GameAction | null => {
-    let best: { playerId: string; slot: number; estimate: number } | null = null
+    let best: { playerId: string; slot: number; score: number } | null = null
     for (const other of state.players) {
       if (other.id === actorId) continue
+      const opponentTotal = memory[other.id].reduce((sum, card) => sum + expectedValue(card, unseenMean), 0)
       for (let slot = 0; slot < 4; slot++) {
         const target = memory[other.id][slot]
         const estimate = exchangeValue(target, unseenMean)
-        const minimumGain = target?.kind === 'number' ? 0.5 : 1
-        if (worstValue - estimate >= minimumGain && (!best || estimate < best.estimate)) {
-          best = { playerId: other.id, slot, estimate }
+        const minimumGain = target?.kind === 'number' ? 0.5 : style.blindSwapGain
+        // Prefer improving our hand while disrupting an observed strong opponent.
+        const score = worstValue - estimate + Math.max(0, 14 - opponentTotal) * 0.04 + roll(`swap-${other.id}-${slot}`) * 0.35
+        if (worstValue - estimate >= minimumGain && (!best || score > best.score)) {
+          best = { playerId: other.id, slot, score }
         }
       }
     }
@@ -631,7 +647,9 @@ export function chooseBotAction(state: GameState, actorId: string): GameAction |
   switch (state.phase) {
     case 'draw': {
       const top = state.discard[state.discard.length - 1]
-      return { type: 'draw', source: top?.kind === 'number' && top.value < worstValue ? 'discard' : 'deck' }
+      const useful = top?.kind === 'number' && top.value < worstValue
+      const passMarginal = !state.knockedBy && useful && top.value > 3 && worstValue - top.value < 2 && roll('take-discard') < style.passSmallDiscard
+      return { type: 'draw', source: useful && !passMarginal ? 'discard' : 'deck' }
     }
     case 'choose': {
       const card = state.drawn
@@ -642,13 +660,21 @@ export function chooseBotAction(state: GameState, actorId: string): GameAction |
         if (card.kind === 'swap') return { type: helpfulSwap() ? 'use-power' : 'discard' }
         return { type: 'use-power' }
       }
-      // On the first Draw Two opportunity, pass a weak improvement to try again.
-      if (state.drawsRemaining > 0 && card.value > 3 && worstValue - card.value < 2) return { type: 'discard' }
+      const improvement = worstValue - card.value
+      if (state.drawsRemaining > 0 && card.value > 3) {
+        const expectedSecondGain = unseen.reduce((sum, chance, value) => sum + chance * Math.max(0, worstValue - value), 0)
+        const requiredGain = Math.min(3.5, Math.max(1.5, expectedSecondGain * style.drawTwoRisk))
+        if (improvement < requiredGain) return { type: 'discard' }
+      }
+      // Occasionally pass a small gain, but always keep useful 0–3s and big gains.
+      if (!state.knockedBy && card.value > 3 && improvement > 0 && improvement < 2 && roll('keep-card') < style.passSmallImprovement) {
+        return { type: 'discard' }
+      }
       return card.value < worstValue ? { type: 'replace', slot: worstSlot } : { type: 'discard' }
     }
     case 'peek-target': {
-      const unknown = own.findIndex((card) => card === null)
-      return unknown >= 0 ? { type: 'peek', slot: unknown } : { type: 'skip' }
+      const unknown = own.map((card, slot) => card === null ? slot : -1).filter((slot) => slot >= 0)
+      return unknown.length ? { type: 'peek', slot: unknown[Math.floor(roll('peek-slot') * unknown.length)] } : { type: 'skip' }
     }
     case 'peeking': return { type: 'finish-peek' }
     case 'swap-target': return helpfulSwap() ?? { type: 'skip' }
@@ -670,7 +696,7 @@ export function chooseBotAction(state: GameState, actorId: string): GameAction |
       const turnsPerPlayer = state.turnNumber / state.players.length
       // Opponents get one final improvement, so call only with a good margin.
       // After several turns, accept a closer race rather than waiting for perfection.
-      const requiredConfidence = turnsPerPlayer >= 8 ? 0.55 : turnsPerPlayer >= 4 ? 0.7 : 0.82
+      const requiredConfidence = (turnsPerPlayer >= 8 ? 0.55 : turnsPerPlayer >= 4 ? 0.7 : 0.82) + style.callConfidence
       // Excellent hands call promptly. Good but less secure hands sometimes
       // wait for another improvement, making timing less predictable.
       const willingness = estimatedTotal <= 6 ? 1 : estimatedTotal === 7 ? 0.8 : estimatedTotal === 8 ? 0.65 : 0.5
