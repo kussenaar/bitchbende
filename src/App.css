@@ -1,4 +1,5 @@
 .app-shell { max-width: 1440px; padding: 0 48px; margin: auto; }
+.beaver { display: block; object-fit: contain; flex-shrink: 0; }
 .site-header { height: 91px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 20px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; font-size: 26px; font-weight: 800; letter-spacing: -1.3px; text-decoration: none; }
 .brand .beaver { width: 46px; height: 46px; }
@@ -290,7 +291,7 @@ button.card:enabled:active { transform: translateY(-2px); }
 .table-grain { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: .06; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%23fff' filter='url(%23n)' opacity='.8' d='M0 0h120v120H0z'/%3E%3C/svg%3E"); }
 .table-center { top: 46%; }
 .table-watermark { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(100% + 20px); opacity: .13; color: #dce8c8; display: flex; gap: 6px; align-items: center; white-space: nowrap; }
-.table-watermark .beaver { width: 26px; height: 26px; filter: grayscale(1) brightness(1.6); }
+.table-watermark .beaver { width: 26px; height: 26px; }
 .table-watermark span { font-size: 8px; letter-spacing: 2px; font-weight: 600; }
 .pile-area { gap: 28px; }
 .pile-label { display: block; font-size: 8px; margin-top: 12px; white-space: nowrap; line-height: 1.5; }

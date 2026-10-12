@@ -28,7 +28,7 @@ export function StartLobby({ onStart, onOnline, onRules }: StartLobbyProps) {
         <div className="art-card art-card-one"><Card faceUp card={{ id: 'art-0', kind: 'number', value: 0 }} /></div>
         <div className="art-card art-card-two"><Card /></div>
         <div className="art-card art-card-three"><Card faceUp card={{ id: 'art-swap', kind: 'swap' }} /></div>
-        <div className="art-mascot"><Beaver variant="face" /></div>
+        <div className="art-mascot"><Beaver /></div>
       </div>
       <div className="play-online-choice"><h3>Play online with friends</h3><p>Share a room code or link. Play with 2–4 people, without computers.</p><button className="button button-secondary" type="button" onClick={onOnline}><Icon name="users" size={18} /> Create or join a room</button></div>
     </section>

@@ -40,7 +40,7 @@ The engine tests cover the exact 66-card deck, hidden information, every power, 
 - `server/rooms.ts`: authoritative room handler, shared by local Node and Supabase Edge.
 - `server/supabase-repository.ts`: atomic revision checks and private durable room storage.
 - `src/components/`: lobbies, invitation flow, cards, call alarm, dialogs, and rules.
-- `public/`: supplied card-back, Swap, Peek, and Draw two images; every hidden card uses the same card-back artwork.
+- `public/`: supplied card-back, Swap, Peek, Draw two, and beaver images; every hidden card uses the same card-back artwork, and the beaver appears throughout the interface and as the browser icon.
 
 All three pages of the supplied `spelregels-beverbende.pdf` were read. The requested `game-rules.pdf` was absent; the attached PDF was used. See [extracted source](docs/rules-source.txt) and [rules and decisions](docs/rules.md). The deck contains four each of 0–8, nine 9s, nine Swap, seven Peek, and five Draw two cards. Default six rounds; ties share the win. Timed games, elimination, and the younger-player variant are not implemented.
 

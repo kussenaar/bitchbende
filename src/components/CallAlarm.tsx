@@ -27,7 +27,7 @@ export function CallAlarm({ callKey, caller, soundEnabled, onMute }: {
     <div className="alarm-beacon alarm-beacon-left" aria-hidden="true">🚨</div>
     <div className="alarm-beacon alarm-beacon-right" aria-hidden="true">🚨</div>
     <div className="alarm-burst">
-      <div className="alarm-beaver" aria-hidden="true"><Beaver variant="face" /></div>
+      <div className="alarm-beaver" aria-hidden="true"><Beaver /></div>
       <strong>BITCHBENDE!</strong>
       <span>{caller} called it. Final turns!</span>
       <button className="button alarm-dismiss" onClick={() => { setBurst(null); onMute() }}>Dismiss alarm</button>
