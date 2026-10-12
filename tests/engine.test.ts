@@ -727,6 +727,104 @@ test('bots call with a strong hand but respect observed opponents and ties', () 
   assert.deepEqual(chooseBotAction(state, 'b'), { type: 'knock' }, 'A guaranteed tied win should end the round')
 })
 
+test('bots never call with ten or more remembered points, even very late in a round', () => {
+  const state = readyGame()
+  state.phase = 'end-turn'
+  for (const other of players) if (other.id !== 'b') state.knowledge.b[other.id] = Array.from({ length: 4 }, () => number(9))
+  for (const values of [[1, 2, 3, 4], [0, 0, 2, 9], [9, 9, 9, 9]]) {
+    state.knowledge.b.b = values.map((value) => number(value))
+    for (const turn of [1, 21, 500, 10001]) {
+      state.turnNumber = turn
+      assert.deepEqual(chooseBotAction(state, 'b'), { type: 'end-turn' }, `Do not call with ${values.join('+')} on turn ${turn}`)
+    }
+  }
+})
+
+test('bots confirm all four numeric cards before calling instead of trusting low estimates', () => {
+  const state = readyGame()
+  state.phase = 'end-turn'
+  for (const other of players) if (other.id !== 'b') state.knowledge.b[other.id] = Array.from({ length: 4 }, () => number(9))
+  for (const uncertain of [null, power('peek'), power('swap'), power('draw')]) {
+    for (let slot = 0; slot < 4; slot++) {
+      state.knowledge.b.b = Array.from({ length: 4 }, () => number(0))
+      state.knowledge.b.b[slot] = uncertain
+      for (const turn of [1, 21, 500, 10001]) {
+        state.turnNumber = turn
+        assert.deepEqual(chooseBotAction(state, 'b'), { type: 'end-turn' }, `Unknown or power card in slot ${slot} must prevent a call on turn ${turn}`)
+      }
+    }
+  }
+  state.knowledge.b.b = [number(0), null, number(0), null]
+  assert.deepEqual(chooseBotAction(state, 'b'), { type: 'end-turn' }, 'Two unknown cards are not a confirmed good hand')
+})
+
+test('bots call promptly with confirmed safe hands of zero to six points', () => {
+  const state = readyGame()
+  state.phase = 'end-turn'
+  for (const other of players) if (other.id !== 'b') state.knowledge.b[other.id] = Array.from({ length: 4 }, () => number(9))
+  for (let score = 0; score <= 6; score++) {
+    state.knowledge.b.b = [number(0), number(0), number(0), number(score)]
+    for (const turn of [1, 5, 21, 500, 10001]) {
+      state.turnNumber = turn
+      assert.deepEqual(chooseBotAction(state, 'b'), { type: 'knock' }, `A confirmed safe ${score}-point hand should call on turn ${turn}`)
+    }
+  }
+})
+
+test('bots sometimes wait with seven to nine points and call more readily with lower scores', () => {
+  const state = readyGame()
+  state.phase = 'end-turn'
+  for (const other of players) if (other.id !== 'b') state.knowledge.b[other.id] = Array.from({ length: 4 }, () => number(9))
+  const rates: number[] = []
+  const samples = 256
+  for (const score of [7, 8, 9]) {
+    state.knowledge.b.b = [number(0), number(1), number(2), number(score - 3)]
+    let calls = 0
+    for (let turn = 0; turn < samples; turn++) {
+      state.turnNumber = 1 + turn * players.length
+      if (chooseBotAction(state, 'b')?.type === 'knock') calls++
+    }
+    assert.ok(calls > 0 && calls < samples, `A safe ${score}-point hand must sometimes call and sometimes wait`)
+    rates.push(calls / samples)
+  }
+  assert.ok(rates[0] > rates[1] && rates[1] > rates[2], `Lower scores should call more readily: ${rates}`)
+  for (let index = 0; index < rates.length; index++) {
+    assert.ok(Math.abs(rates[index] - [0.8, 0.65, 0.5][index]) < 0.2, `Call variation should remain sensible: ${rates}`)
+  }
+  state.knowledge.b.c = [number(0), number(1), number(2), number(5)]
+  for (let turn = 0; turn < samples; turn++) {
+    state.turnNumber = 1 + turn * players.length
+    assert.deepEqual(chooseBotAction(state, 'b'), { type: 'end-turn' }, 'Variation must never override an observed opponent with a better hand')
+  }
+})
+
+test('varied bot calls are reproducible and independent of hidden state', () => {
+  const state = readyGame()
+  state.phase = 'end-turn'
+  state.knowledge.b.b = [number(0), number(1), number(2), number(6)]
+  for (const other of players) if (other.id !== 'b') state.knowledge.b[other.id] = Array.from({ length: 4 }, () => number(9))
+  const observed = new Set<string>()
+  for (let turn = 0; turn < 64; turn++) {
+    state.turnNumber = 1 + turn * players.length
+    const original = freezeDeep(structuredClone(state))
+    const decision = chooseBotAction(original, 'b')
+    assert.ok(decision)
+    observed.add(decision.type)
+    assert.deepEqual(chooseBotAction(original, 'b'), decision, 'Repeated decisions at the same turn must agree')
+    const hiddenChanged = structuredClone(state)
+    for (const player of hiddenChanged.players) {
+      player.hand = player.hand.map((_, slot) => number(9, `hidden-${player.id}-${slot}`))
+      if (player.id !== 'b') {
+        for (const other of hiddenChanged.players) hiddenChanged.knowledge[player.id][other.id] = [null, null, null, null]
+      }
+    }
+    hiddenChanged.deck.reverse()
+    hiddenChanged.rng = 42
+    assert.deepEqual(chooseBotAction(freezeDeep(hiddenChanged), 'b'), decision, 'Call timing must not reveal hidden hands, deck order, RNG, or other memories')
+  }
+  assert.deepEqual([...observed].sort(), ['end-turn', 'knock'], 'Both a call and a wait must be checked for hidden-state independence')
+})
+
 test('bot decisions never depend on hidden hands, deck order, RNG, or other players’ private memories', () => {
   for (const phase of ['draw', 'choose', 'peek-target', 'swap-target', 'end-turn'] as const) {
     const state = readyGame()
@@ -791,6 +889,12 @@ test('deterministic two-to-four-player bot matches finish and preserve card, tur
         action = chooseBotAction(state, actorId)
       }
       assert.ok(action, `Seed ${seed}: no bot action in ${state.phase}`)
+      if (action.type === 'knock') {
+        const own = state.knowledge[actorId][actorId]
+        assert.ok(own.every((card) => card?.kind === 'number'), `Seed ${seed}: a bot called without confirming its hand`)
+        const score = own.reduce((sum, card) => sum + (card?.kind === 'number' ? card.value : Infinity), 0)
+        assert.ok(score < 10, `Seed ${seed}: a bot called with ${score} points`)
+      }
       const before = JSON.stringify(state)
       state = command(state, action, actorId)
       assert.equal(isGameState(state), true, `Seed ${seed}: transition produced an invalid save`)

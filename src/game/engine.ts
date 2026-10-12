@@ -593,6 +593,17 @@ function scoreProbabilities(hand: (Card | null)[], unseen: number[]): number[] {
   return totals
 }
 
+/** Stable variation per turn, using public facts instead of the hidden shuffle RNG. */
+function botCallRoll(state: GameState, actorId: string): number {
+  let hash = 2166136261
+  for (const character of `${actorId}:${state.round}:${state.turnNumber}`) {
+    hash = Math.imul(hash ^ character.charCodeAt(0), 16777619)
+  }
+  hash = Math.imul(hash ^ (hash >>> 16), 0x85ebca6b)
+  hash = Math.imul(hash ^ (hash >>> 13), 0xc2b2ae35)
+  return ((hash ^ (hash >>> 16)) >>> 0) / 4294967296
+}
+
 /** Bot strategy reads only its own observed knowledge and its own drawn card. */
 export function chooseBotAction(state: GameState, actorId: string): GameAction | null {
   const player = state.players.find((candidate) => candidate.id === actorId)
@@ -647,7 +658,11 @@ export function chooseBotAction(state: GameState, actorId: string): GameAction |
     case 'draw-again': return { type: 'draw-again' }
     case 'end-turn': {
       if (state.knockedBy) return { type: 'end-turn' }
+      // A good-looking estimate must not trigger a call with unknown cards or
+      // powers that will turn into random numbers at scoring time.
+      if (own.some((card) => card?.kind !== 'number')) return { type: 'end-turn' }
       const estimatedTotal = own.reduce((sum, card) => sum + expectedValue(card, unseenMean), 0)
+      if (estimatedTotal >= 10) return { type: 'end-turn' }
       const opponents = state.players.filter((other) => other.id !== actorId).map((other) => memory[other.id])
       const opponentBest = Math.min(...opponents.map((hand) => hand.reduce((sum, card) => sum + expectedValue(card, unseenMean), 0)))
       const ownChances = scoreProbabilities(own, unseen)
@@ -655,13 +670,14 @@ export function chooseBotAction(state: GameState, actorId: string): GameAction |
       const confidence = ownChances.reduce((chance, probability, score) => chance + probability * opponentChances.reduce(
         (all, totals) => all * totals.slice(score).reduce((sum, value) => sum + value, 0), 1,
       ), 0)
-      const uncertain = own.filter((card) => card?.kind !== 'number').length
       const turnsPerPlayer = state.turnNumber / state.players.length
       // Opponents get one final improvement, so call only with a good margin.
       // After several turns, accept a closer race rather than waiting for perfection.
-      const requiredConfidence = (turnsPerPlayer >= 8 ? 0.55 : turnsPerPlayer >= 4 ? 0.7 : 0.82) + uncertain * 0.025
-      const canAssess = uncertain <= (turnsPerPlayer >= 5 ? 2 : 1)
-      return canAssess && estimatedTotal <= opponentBest && confidence >= requiredConfidence
+      const requiredConfidence = turnsPerPlayer >= 8 ? 0.55 : turnsPerPlayer >= 4 ? 0.7 : 0.82
+      // Excellent hands call promptly. Good but less secure hands sometimes
+      // wait for another improvement, making timing less predictable.
+      const willingness = estimatedTotal <= 6 ? 1 : estimatedTotal === 7 ? 0.8 : estimatedTotal === 8 ? 0.65 : 0.5
+      return estimatedTotal <= opponentBest && confidence >= requiredConfidence && botCallRoll(state, actorId) < willingness
         ? { type: 'knock' }
         : { type: 'end-turn' }
     }

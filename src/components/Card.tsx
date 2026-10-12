@@ -1,5 +1,3 @@
-import { Beaver } from './Beaver'
-
 export type CardData = { id: string; kind: 'number'; value: number } | { id: string; kind: 'peek' | 'swap' | 'draw' }
 
 type CardProps = {
@@ -25,7 +23,7 @@ export function Card({ card, faceUp = false, small = false, selected = false, di
     <span className="card-value" aria-hidden="true">{card.value}</span>
     <span className="card-number-line" aria-hidden="true" />
     <span className="card-corner card-corner-bottom" aria-hidden="true">{card.value}</span>
-  </> : <img className="card-art" src={`${import.meta.env.BASE_URL}${encodeURIComponent(powerArtwork[card.kind])}`} alt="" aria-hidden="true" draggable={false} />) : <><span className="card-back-pattern" aria-hidden="true" /><span className="card-back-medallion" aria-hidden="true"><Beaver variant="face" /></span></>
+  </> : <img className="card-art" src={`${import.meta.env.BASE_URL}${encodeURIComponent(powerArtwork[card.kind])}`} alt="" aria-hidden="true" draggable={false} />) : <img className="card-art card-back-art" src={`${import.meta.env.BASE_URL}${encodeURIComponent('Back of the card.png')}`} alt="" aria-hidden="true" draggable={false} />
 
   if (onClick) return <button type="button" className={classes} disabled={disabled} aria-label={accessibleLabel} aria-pressed={selected || undefined} onClick={onClick}>{content}</button>
   return <div className={classes} role="img" aria-label={accessibleLabel}>{content}</div>

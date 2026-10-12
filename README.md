@@ -4,6 +4,8 @@
 
 React, TypeScript, and Vite card game for **2–4 players**. Play against one to three computers, or create a friends-only online room. The host starts when everyone has joined; invite by code or link. Computers remember observed cards, protect low values, and use powers and discards strategically.
 
+Computers call Bitchbende only after remembering all four number cards with a total under 10. They call promptly with strong hands and sometimes wait for another improvement at 7–9 points, while considering what they know about opponents.
+
 ## Local play
 
 Use Node.js 24 or newer:
@@ -38,7 +40,7 @@ The engine tests cover the exact 66-card deck, hidden information, every power, 
 - `server/rooms.ts`: authoritative room handler, shared by local Node and Supabase Edge.
 - `server/supabase-repository.ts`: atomic revision checks and private durable room storage.
 - `src/components/`: lobbies, invitation flow, cards, call alarm, dialogs, and rules.
-- `public/`: supplied Swap, Peek, and Draw two images; hidden hands never render this artwork.
+- `public/`: supplied card-back, Swap, Peek, and Draw two images; every hidden card uses the same card-back artwork.
 
 All three pages of the supplied `spelregels-beverbende.pdf` were read. The requested `game-rules.pdf` was absent; the attached PDF was used. See [extracted source](docs/rules-source.txt) and [rules and decisions](docs/rules.md). The deck contains four each of 0–8, nine 9s, nine Swap, seven Peek, and five Draw two cards. Default six rounds; ties share the win. Timed games, elimination, and the younger-player variant are not implemented.
 
