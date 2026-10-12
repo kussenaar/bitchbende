@@ -1,4 +1,5 @@
 import type { ActionResult, Card, GameAction, GameLog, GameState, GameView, PublicCardMove, RoundResult } from './types.ts'
+import { activityText } from './activity.ts'
 
 export type { Card, GameAction, GamePhase, GameState, GameView, PlayerView, PublicCardMove, RoundResult } from './types.ts'
 
@@ -344,7 +345,7 @@ export function applyAction(previous: GameState, actorId: string, action: GameAc
         const top = state.discard[state.discard.length - 1]
         if (!top || top.kind !== 'number') return fail('Only a number card can be taken from the discard pile.')
         state.drawn = state.discard.pop()!
-        log(state, actorId, `${player.name} took ${top.value} from the discard pile.`, {
+        log(state, actorId, `${player.name} took a card from the discard pile.`, {
           type: 'draw', revision: state.revision + 1, playerId: actorId, source: 'discard', card: top,
         })
       } else {
@@ -367,7 +368,7 @@ export function applyAction(previous: GameState, actorId: string, action: GameAc
       for (const viewer of state.players) {
         setKnown(state, viewer.id, actorId, action.slot, viewer.id === actorId || state.drawnSource === 'discard' ? card : null)
       }
-      log(state, actorId, `${player.name} replaced card ${action.slot + 1} and discarded ${cardLabel(old)}.`, {
+      log(state, actorId, `${player.name} replaced a card.`, {
         type: 'replace', revision: state.revision + 1, playerId: actorId, slot: action.slot,
         source: state.drawnSource!, incoming: state.drawnSource === 'discard' ? card : null, discarded: old,
       })
@@ -379,7 +380,7 @@ export function applyAction(previous: GameState, actorId: string, action: GameAc
       if (state.drawnSource === 'discard') return fail('A card taken from the discard pile must replace one of your cards.')
       const card = state.drawn
       state.discard.push(card)
-      log(state, actorId, `${player.name} discarded ${cardLabel(card)}.`, {
+      log(state, actorId, `${player.name} discarded a card.`, {
         type: 'discard', revision: state.revision + 1, playerId: actorId, card,
       })
       state.drawn = null
@@ -424,7 +425,7 @@ export function applyAction(previous: GameState, actorId: string, action: GameAc
       setKnown(state, actorId, actorId, action.slot, player.hand[action.slot])
       state.peekedSlot = action.slot
       state.phase = 'peeking'
-      log(state, actorId, `${player.name} peeked at card ${action.slot + 1}.`)
+      log(state, actorId, `${player.name} peeked at a card.`)
       break
     }
     case 'finish-peek': {
@@ -443,7 +444,7 @@ export function applyAction(previous: GameState, actorId: string, action: GameAc
         setKnown(state, viewer.id, actorId, action.ownSlot, knownOther)
         setKnown(state, viewer.id, target.id, action.targetSlot, knownOwn)
       }
-      log(state, actorId, `${player.name} swapped card ${action.ownSlot + 1} with ${target.name}’s card ${action.targetSlot + 1}.`, {
+      log(state, actorId, `${player.name} swapped a card with ${target.name}.`, {
         type: 'swap', revision: state.revision + 1, playerId: actorId, slot: action.ownSlot,
         targetPlayerId: target.id, targetSlot: action.targetSlot,
       })
@@ -488,10 +489,6 @@ export function applyAction(previous: GameState, actorId: string, action: GameAc
   return { ok: true, state }
 }
 
-function cardLabel(card: Card): string {
-  return card.kind === 'number' ? String(card.value) : ({ peek: 'Peek', swap: 'Swap', draw: 'Draw Two' } as const)[card.kind]
-}
-
 function publicCard(card: Card): Card {
   return card.kind === 'number'
     ? { id: card.id, kind: 'number', value: card.value }
@@ -499,8 +496,8 @@ function publicCard(card: Card): Card {
 }
 
 /** Explicitly project metadata instead of forwarding arbitrary persisted fields. */
-function publicLog(entry: GameLog): GameLog {
-  const result: GameLog = { id: entry.id, round: entry.round, playerId: entry.playerId, text: entry.text }
+function publicLog(entry: GameLog, players: GameState['players']): GameLog {
+  const result: GameLog = { id: entry.id, round: entry.round, playerId: entry.playerId, text: activityText(entry, players) }
   const move = entry.move
   if (!move) return result
   const common = { revision: move.revision, playerId: move.playerId }
@@ -548,7 +545,7 @@ export function getPlayerView(state: GameState, viewerId: string): GameView {
     drawnSource: state.drawnSource, drawsRemaining: state.drawsRemaining,
     peekedSlot: current.id === viewerId ? state.peekedSlot : null,
     knockedBy: state.knockedBy, finalTurnsRemaining: state.finalTurnsRemaining,
-    log: state.log.map(publicLog), roundResult: revealed ? state.roundResult : null, winners: state.winners,
+    log: state.log.map((entry) => publicLog(entry, state.players)), roundResult: revealed ? state.roundResult : null, winners: state.winners,
   }
   // Detach all references so consumers cannot mutate authoritative cards or logs.
   return structuredClone(view)

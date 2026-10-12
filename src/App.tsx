@@ -5,6 +5,7 @@ import { OnlineRoom } from './components/OnlineRoom'
 import { StartLobby } from './components/StartLobby'
 import { hasSavedRoom, getInviteCode } from './game/online'
 import { setGameSound, stopCallSiren, unlockGameAudio } from './game/audio'
+import { activityText } from './game/activity'
 import { Beaver } from './components/Beaver'
 import { Card } from './components/Card'
 import { Dialog } from './components/Dialog'
@@ -65,7 +66,8 @@ function GameTable({ session, onNewGame, onRules, soundEnabled, roomCode, canAdv
   const message = describeTurn(view, ownId, selectedSlot)
   const activeName = view.players.find((player) => player.id === view.currentPlayerId)?.name
   const caller = view.players.find((player) => player.id === view.knockedBy)?.name
-  const lastAction = myTurn && view.phase === 'end-turn' ? [...view.log].reverse().find((entry) => entry.playerId === ownId && entry.round === view.round)?.text : undefined
+  const activity = view.log.map((entry) => ({ ...entry, text: activityText(entry, view.players) }))
+  const lastAction = myTurn && view.phase === 'end-turn' ? [...activity].reverse().find((entry) => entry.playerId === ownId && entry.round === view.round)?.text : undefined
   const online = session.mode === 'online'
   const botCount = view.players.length - 1
   const seats = view.players.length === 2 ? ['seat-bottom', 'seat-top'] : view.players.length === 3 ? ['seat-bottom', 'seat-left', 'seat-right'] : ['seat-bottom', 'seat-left', 'seat-top', 'seat-right']
@@ -116,7 +118,7 @@ function GameTable({ session, onNewGame, onRules, soundEnabled, roomCode, canAdv
         {!myTurn && view.phase !== 'initial' && <span className="thinking-dots" aria-label={online ? 'Waiting for another player' : 'Computer opponent is thinking'}><i /><i /><i /></span>}
       </div></section>}
       {error && <div className="notice error-notice" role="alert">{error}</div>}<div className="table-tip"><Icon name="eye" size={15} /><span>{over ? 'Power cards in a hand are replaced with number cards for scoring.' : 'Replaced cards go face up on the discard pile. The next player may take the top number card.'}</span></div>
-    </div><aside className="sidebar"><Scoreboard view={view} ownId={ownId} /><section className="panel activity-panel"><div className="panel-header"><h2>Activity</h2><span className="live-dot" /></div><div className="activity-list" ref={activityRef} aria-label="Recent game activity">{[...view.log].reverse().slice(0, 14).map((entry, index) => <div className={`activity-item${index === 0 ? ' activity-latest' : ''}`} key={entry.id}><span className="activity-dot" /><div><p>{entry.text}</p><span>Round {entry.round}</span></div></div>)}</div></section><button className="rules-teaser" onClick={onRules}><span className="rules-teaser-icon"><Icon name="help" size={24} /></span><span><strong>How to play</strong><small>Rules and card powers</small></span><Icon name="chevron" size={17} /></button><p className="local-table-note"><span className="status-dot" /> {online ? `${view.players.length} friends · no computers` : `You + ${botCount} computer ${botCount === 1 ? 'opponent' : 'opponents'}`}<br /><span>{online ? 'This browser remembers your seat.' : 'Progress saves on this browser.'}</span></p></aside></div>
+    </div><aside className="sidebar"><Scoreboard view={view} ownId={ownId} /><section className="panel activity-panel"><div className="panel-header"><h2>Activity</h2><span className="live-dot" /></div><div className="activity-list" ref={activityRef} aria-label="Recent game activity">{[...activity].reverse().slice(0, 14).map((entry, index) => <div className={`activity-item${index === 0 ? ' activity-latest' : ''}`} key={entry.id}><span className="activity-dot" /><div><p>{entry.text}</p><span>Round {entry.round}</span></div></div>)}</div></section><button className="rules-teaser" onClick={onRules}><span className="rules-teaser-icon"><Icon name="help" size={24} /></span><span><strong>How to play</strong><small>Rules and card powers</small></span><Icon name="chevron" size={17} /></button><p className="local-table-note"><span className="status-dot" /> {online ? `${view.players.length} friends · no computers` : `You + ${botCount} computer ${botCount === 1 ? 'opponent' : 'opponents'}`}<br /><span>{online ? 'This browser remembers your seat.' : 'Progress saves on this browser.'}</span></p></aside></div>
   </main>
 }
 

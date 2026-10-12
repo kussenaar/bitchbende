@@ -21,6 +21,8 @@ Memorize your outside cards, then hide them. Draw or take the face-up numeric di
 
 Replacements and swaps animate between numbered card positions, with a brief pause before computers continue. Blind swaps stay face down. Position numbers remain visible when choosing a swap, including on phones.
 
+Activity records actions and player names without keeping card values or positions. Public cards and swap positions are visible as the moves happen, so players need to remember them.
+
 Optional separate processes: `npm run dev:client` and `npm run dev:server`. To test from a phone on the same network, run `npm run dev -- --host 0.0.0.0` and set the room server's `ALLOWED_ORIGIN` to the printed network origin. Internet rooms need the Supabase deployment below.
 
 ## Validation

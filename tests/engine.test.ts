@@ -203,6 +203,7 @@ test('public move events preserve the draw/replacement sequence without exposing
   assert.deepEqual(state.log.at(-1)?.move, { type: 'draw', revision: drawRevision, playerId: 'b', source: 'deck', card: null })
   state = command(state, { type: 'replace', slot: 1 })
   const replaceRevision = state.revision
+  assert.equal(state.log.at(-1)?.text, 'Bo replaced a card.')
   assert.deepEqual(state.log.at(-1)?.move, {
     type: 'replace', revision: replaceRevision, playerId: 'b', slot: 1, source: 'deck', incoming: null, discarded: firstOutgoing,
   })
@@ -215,6 +216,7 @@ test('public move events preserve the draw/replacement sequence without exposing
   state = command(state, { type: 'end-turn' })
   state = command(state, { type: 'draw', source: 'discard' })
   const publicDrawRevision = state.revision
+  assert.equal(state.log.at(-1)?.text, 'Cleo took a card from the discard pile.')
   assert.deepEqual(state.log.at(-1)?.move, {
     type: 'draw', revision: publicDrawRevision, playerId: 'c', source: 'discard', card: firstOutgoing,
   })
@@ -240,6 +242,7 @@ test('a blind swap event reveals only its public slots and stays detached from a
   const targetBefore = state.players[3].hand[3]
   state = command(state, { type: 'swap', ownSlot: 0, targetPlayerId: 'd', targetSlot: 3 })
   const expected = { type: 'swap', revision: state.revision, playerId: 'b', slot: 0, targetPlayerId: 'd', targetSlot: 3 }
+  assert.equal(state.log.at(-1)?.text, 'Bo swapped a card with Daan.')
   assert.deepEqual(state.log.at(-1)?.move, expected)
   assert.deepEqual(state.players[1].hand[0], targetBefore)
   assert.deepEqual(state.players[3].hand[3], ownBefore)
@@ -262,6 +265,7 @@ test('ordinary discards and power activations emit only the revealed card for an
   discarded = command(discarded, { type: 'draw', source: 'deck' })
   const ordinaryCard = discarded.drawn!
   discarded = command(discarded, { type: 'discard' })
+  assert.equal(discarded.log.at(-1)?.text, 'Bo discarded a card.')
   assert.deepEqual(discarded.log.at(-1)?.move, { type: 'discard', revision: discarded.revision, playerId: 'b', card: ordinaryCard })
   for (const kind of ['peek', 'swap', 'draw'] as const) {
     let state = readyGame(123)
