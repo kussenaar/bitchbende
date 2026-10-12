@@ -1,5 +1,7 @@
 # Bitchbende
 
+[Play Bitchbende](https://kussenaar.github.io/bitchbende/)
+
 React, TypeScript, and Vite card game for **2–4 players**. Play against one to three computers, or create a friends-only online room. The host starts when everyone has joined; invite by code or link. Computers remember observed cards, protect low values, and use powers and discards strategically.
 
 ## Local play

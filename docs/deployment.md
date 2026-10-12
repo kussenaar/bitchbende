@@ -4,6 +4,22 @@ GitHub Pages serves the website. Supabase runs the private room database and gam
 server. Computer games work without Supabase; friends on different devices need
 both deployments.
 
+## This project's deployment
+
+- Website: [Play Bitchbende](https://kussenaar.github.io/bitchbende/).
+- Source and deploy status: [kussenaar/bitchbende](https://github.com/kussenaar/bitchbende).
+- Backend: [Supabase project dashboard](https://supabase.com/dashboard/project/zvpmevvqgpwtmmabveak).
+- Project reference: `zvpmevvqgpwtmmabveak`, in Ireland (`eu-west-1`), under the free **Bitchbende** organization.
+- Room API: `https://zvpmevvqgpwtmmabveak.supabase.co/functions/v1/game`.
+
+The GitHub Pages source and public API build variable are configured. The database
+password is stored in macOS Keychain under **Bitchbende Supabase database**, with
+the project reference as its account name. No database password or account token
+belongs in this repository.
+
+For updates, follow **Subsequent updates** below. The initial setup instructions
+are useful if deploying a separate copy.
+
 Run commands from the project root. Replace `YOUR_GITHUB_USERNAME` and
 `YOUR_PROJECT_REF` below. Keep passwords and access tokens in the CLI login
 prompts; there is no need to paste them into chat.
