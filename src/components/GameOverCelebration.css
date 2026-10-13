@@ -1,0 +1,73 @@
+.match-celebration {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  pointer-events: none;
+  background: #173f355c;
+}
+
+.celebration-rays {
+  position: absolute;
+  width: 220vmax;
+  height: 220vmax;
+  background: repeating-conic-gradient(#ffcf5666 0deg 15deg, #ffcf5610 15deg 30deg);
+  animation: celebration-spin 25s linear infinite;
+}
+
+.celebration-confetti { position: absolute; inset: 0; overflow: hidden; }
+.celebration-confetti i {
+  position: absolute;
+  left: var(--left);
+  top: -30px;
+  width: 12px;
+  height: 22px;
+  background: var(--color);
+  border: 1px solid #173f35;
+  animation: celebration-fall var(--duration) var(--delay) linear infinite;
+}
+
+.celebration-burst {
+  position: relative;
+  width: min(88vw, 780px);
+  padding: 50px 24px 28px;
+  text-align: center;
+  color: #542c24;
+  background: #ffdf70;
+  border: 6px solid #542c24;
+  border-radius: 27% 18% 25% 20% / 22% 28% 20% 30%;
+  box-shadow: 13px 15px 0 #542c24;
+  transform: rotate(-3deg);
+  animation: celebration-pop .65s cubic-bezier(.2, 1.5, .5, 1) both;
+}
+
+.celebration-kicker { display: block; font-size: clamp(13px, 2.4vw, 20px); font-weight: 900; letter-spacing: .15em; }
+.celebration-burst > strong { display: block; margin: 12px 0 5px; font: 900 clamp(30px, 8vw, 88px)/1.1 Impact, 'Arial Black', sans-serif; overflow-wrap: anywhere; text-shadow: 4px 4px 0 #fff9d3; }
+.celebration-winner { display: block; font: 900 clamp(24px, 5vw, 48px)/1.2 Impact, 'Arial Black', sans-serif; }
+.celebration-burst p { margin: 16px 0 20px; font-weight: 800; font-size: clamp(13px, 2vw, 18px); }
+.celebration-dismiss { pointer-events: auto; min-height: 44px; color: #fff9d3; background: #542c24; }
+.celebration-beaver { position: absolute; width: 132px; height: 132px; top: -106px; left: calc(50% - 66px); rotate: 8deg; animation: celebration-dance .65s ease-in-out infinite alternate; }
+.celebration-beaver .beaver { width: 100%; height: 100%; }
+.celebration-beaver > span { position: absolute; top: -22px; left: 31px; font-size: 52px; rotate: -12deg; }
+.celebration-trophy { position: absolute; font-size: clamp(55px, 10vw, 130px); top: 15%; animation: celebration-dance .8s ease-in-out infinite alternate; }
+.trophy-left { left: 6%; rotate: -18deg; }
+.trophy-right { right: 6%; rotate: 18deg; animation-delay: -.4s; }
+
+@keyframes celebration-spin { to { rotate: 360deg; } }
+@keyframes celebration-fall { to { transform: translate(var(--drift), calc(100dvh + 60px)) rotate(700deg); } }
+@keyframes celebration-pop { from { scale: .15; opacity: 0; rotate: -15deg; } to { scale: 1; opacity: 1; rotate: 0deg; } }
+@keyframes celebration-dance { from { transform: translateY(0) rotate(-8deg); } to { transform: translateY(-12px) rotate(8deg); } }
+
+@media (max-width: 650px) {
+  .celebration-burst { padding: 40px 16px 22px; border-width: 4px; box-shadow: 7px 9px 0 #542c24; }
+  .celebration-beaver { width: 100px; height: 100px; left: calc(50% - 50px); top: -80px; }
+  .celebration-beaver > span { font-size: 40px; left: 22px; top: -18px; }
+  .celebration-trophy { top: 10%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .celebration-rays, .celebration-confetti i, .celebration-burst, .celebration-beaver, .celebration-trophy { animation: none; }
+  .celebration-confetti { display: none; }
+}

@@ -3,20 +3,22 @@ import { createPortal } from 'react-dom'
 import type { Card as GameCard, GameView, PublicCardMove } from '../game/types'
 import { cardMoveTiming } from '../game/presentation'
 import { Card } from './Card'
+import type { PresentedMove } from './useCardPresentation'
 import './CardMotion.css'
 
 type MovingAction = Extract<PublicCardMove, { type: 'replace' | 'swap' }>
-type QueuedMove = { id: number; move: MovingAction; caption: string }
 type Box = { x: number; y: number; width: number; height: number }
 type Flight = { from: Box; to: Box; card: GameCard | null; bend: number }
 type PositionLabel = { box: Box; text: string }
-type Geometry = { id: number; flights: Flight[]; hidden: HTMLElement[]; targets: HTMLElement[]; labels: PositionLabel[] }
+type Geometry = { id: string; origin: { x: number; y: number }; flights: Flight[]; hidden: HTMLElement[]; targets: HTMLElement[]; labels: PositionLabel[] }
 
 type CardMotionProps = {
   view: GameView
   viewerId: string
   tableRef: RefObject<HTMLDivElement | null>
-  onAnimatingChange: (animating: boolean) => void
+  active: PresentedMove | undefined
+  onLand: (move: PresentedMove) => void
+  onFinish: (move: PresentedMove) => void
 }
 
 function cardBox(element: HTMLElement): Box {
@@ -63,12 +65,14 @@ function moveCaption(move: MovingAction, view: GameView) {
   return `${player} replaces card ${move.slot + 1} · ${discarded} goes to the discard pile`
 }
 
-function measureMove(active: QueuedMove, table: HTMLElement, view: GameView): Geometry | null {
+function measureMove(active: PresentedMove, table: HTMLElement, view: GameView): Geometry | null {
   const { move } = active
   const own = slotElement(table, move.playerId, move.slot)
   if (!own) return null
   const ownBox = cardBox(own)
   const ownName = view.players.find((player) => player.id === move.playerId)?.name ?? 'Player'
+  const tableRect = table.getBoundingClientRect()
+  const origin = { x: tableRect.left, y: tableRect.top }
   if (move.type === 'swap') {
     const other = slotElement(table, move.targetPlayerId, move.targetSlot)
     if (!other) return null
@@ -76,6 +80,7 @@ function measureMove(active: QueuedMove, table: HTMLElement, view: GameView): Ge
     const otherName = view.players.find((player) => player.id === move.targetPlayerId)?.name ?? 'Player'
     return {
       id: active.id,
+      origin,
       flights: [{ from: ownBox, to: otherBox, card: null, bend: 1 }, { from: otherBox, to: ownBox, card: null, bend: 1 }],
       hidden: [own, other], targets: [own, other],
       labels: [{ box: ownBox, text: `${ownName} · ${move.slot + 1}` }, { box: otherBox, text: `${otherName} · ${move.targetSlot + 1}` }],
@@ -87,6 +92,7 @@ function measureMove(active: QueuedMove, table: HTMLElement, view: GameView): Ge
   const discardBox = cardBox(discard)
   return {
     id: active.id,
+    origin,
     flights: [{ from: ownBox, to: discardBox, card: move.discarded, bend: 1 }, { from: cardBox(source), to: ownBox, card: move.incoming, bend: 1 }],
     hidden: [own, discard], targets: [own, discard],
     labels: [{ box: ownBox, text: `${ownName} · ${move.slot + 1}` }, { box: discardBox, text: 'Discard' }],
@@ -94,48 +100,27 @@ function measureMove(active: QueuedMove, table: HTMLElement, view: GameView): Ge
 }
 
 /** Animates only public moves. In particular, a blind swap never receives card faces. */
-export function CardMotion({ view, viewerId, tableRef, onAnimatingChange }: CardMotionProps) {
-  const cursor = useRef({ round: view.round, id: Math.max(0, ...view.log.map((entry) => entry.id)) })
-  const [moves, setMoves] = useState<QueuedMove[]>([])
+export function CardMotion({ view, viewerId, tableRef, active, onLand, onFinish }: CardMotionProps) {
   const [geometry, setGeometry] = useState<Geometry | null>(null)
   const [landed, setLanded] = useState(false)
   const flyingCards = useRef<(HTMLDivElement | null)[]>([])
+  const movingTable = useRef<HTMLDivElement>(null)
   const latestView = useRef(view)
-  latestView.current = view
+  useLayoutEffect(() => { latestView.current = view })
   const arrowId = `card-motion-arrow-${useId().replaceAll(':', '')}`
-  const active = moves[0]
-  const animating = moves.length > 0
-
-  useLayoutEffect(() => {
-    const latestId = Math.max(cursor.current.id, ...view.log.map((entry) => entry.id))
-    if (cursor.current.round !== view.round) {
-      cursor.current = { round: view.round, id: latestId }
-      setMoves([])
-      return
-    }
-    const fresh = view.log.filter((entry) => entry.id > cursor.current.id && entry.round === view.round && (entry.move?.type === 'replace' || entry.move?.type === 'swap'))
-      .sort((a, b) => a.id - b.id)
-      .slice(-8)
-      .map((entry) => ({ id: entry.id, move: entry.move as MovingAction, caption: moveCaption(entry.move as MovingAction, view) }))
-    cursor.current.id = latestId
-    if (fresh.length) setMoves((queued) => queued.length ? [queued[0], ...[...queued.slice(1), ...fresh].slice(-7)] : fresh)
-  }, [view.log, view.round, view])
-
-  useLayoutEffect(() => { onAnimatingChange(animating) }, [animating, onAnimatingChange])
-  useLayoutEffect(() => () => onAnimatingChange(false), [onAnimatingChange])
 
   useLayoutEffect(() => {
     setLanded(false)
     if (!active || !tableRef.current) { setGeometry(null); return }
     const measured = measureMove(active, tableRef.current, latestView.current)
     setGeometry(measured)
-    if (!measured) setMoves((queued) => queued[0]?.id === active.id ? queued.slice(1) : queued)
-  }, [active, tableRef])
+    if (!measured) onFinish(active)
+  }, [active, tableRef, onFinish])
 
   useLayoutEffect(() => {
     if (!active || !geometry || geometry.id !== active.id) return
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const { flightMs, landingMs, reducedMs } = cardMoveTiming(active.move, viewerId)
+    const { flightMs, landingMs, reducedMs } = active.scoringIndex === undefined ? cardMoveTiming(active.move, viewerId) : { flightMs: 1800, landingMs: 650, reducedMs: 900 }
     const animations: Animation[] = []
     let landingTimer: ReturnType<typeof setTimeout> | undefined
     let finishTimer: ReturnType<typeof setTimeout> | undefined
@@ -145,12 +130,13 @@ export function CardMotion({ view, viewerId, tableRef, onAnimatingChange }: Card
     const finish = () => {
       if (finished) return
       finished = true
-      setMoves((queued) => queued[0]?.id === active.id ? queued.slice(1) : queued)
+      onFinish(active)
     }
     const land = () => {
       restoreCards()
       geometry.targets.forEach((element) => element.classList.add('card-move-target'))
       setLanded(true)
+      onLand(active)
     }
 
     if (reducedMotion) {
@@ -166,35 +152,43 @@ export function CardMotion({ view, viewerId, tableRef, onAnimatingChange }: Card
       finishTimer = setTimeout(finish, flightMs + landingMs)
     }
 
-    const handleScroll = (event: Event) => {
-      if (event.target === window || event.target === document || event.target === document.documentElement || event.target === document.body) finish()
+    const alignWithTable = () => {
+      const table = tableRef.current
+      if (!table || !movingTable.current) return
+      const rect = table.getBoundingClientRect()
+      movingTable.current.style.transform = `translate3d(${rect.left - geometry.origin.x}px, ${rect.top - geometry.origin.y}px, 0)`
     }
     const viewport = window.visualViewport
-    const viewportHeight = viewport?.height
-    const viewportScale = viewport?.scale
-    const handleViewportResize = () => {
-      // Showing a scrollbar can change only the visual width when the action panel
-      // changes. That should not cut a just-started swap short.
-      if (viewport && (Math.abs(viewport.height - (viewportHeight ?? viewport.height)) > 2 || viewport.scale !== viewportScale)) finish()
+    const layoutWidth = window.innerWidth
+    const handleResize = () => {
+      // Mobile browser toolbars resize the viewport during scrolling. Preserve
+      // the flight unless a width change actually reflows the card positions.
+      if (Math.abs(window.innerWidth - layoutWidth) > 2) finish()
+      else alignWithTable()
     }
-    window.addEventListener('resize', finish)
-    window.addEventListener('scroll', handleScroll, { capture: true, passive: true })
-    viewport?.addEventListener('resize', handleViewportResize)
+    alignWithTable()
+    window.addEventListener('resize', handleResize)
+    window.addEventListener('scroll', alignWithTable, { capture: true, passive: true })
+    viewport?.addEventListener('resize', alignWithTable)
+    viewport?.addEventListener('scroll', alignWithTable)
     return () => {
       clearTimeout(landingTimer)
       clearTimeout(finishTimer)
       animations.forEach((animation) => animation.cancel())
       restoreCards()
       geometry.targets.forEach((element) => element.classList.remove('card-move-target'))
-      window.removeEventListener('resize', finish)
-      window.removeEventListener('scroll', handleScroll, true)
-      viewport?.removeEventListener('resize', handleViewportResize)
+      window.removeEventListener('resize', handleResize)
+      window.removeEventListener('scroll', alignWithTable, true)
+      viewport?.removeEventListener('resize', alignWithTable)
+      viewport?.removeEventListener('scroll', alignWithTable)
     }
-  }, [active, geometry, viewerId])
+  }, [active, geometry, viewerId, tableRef, onLand, onFinish])
 
   if (!active || !geometry || geometry.id !== active.id) return null
 
-  return createPortal(<div className={`card-motion-layer${landed ? ' card-motion-landed' : ''}`} data-motion-kind={active.move.type}>
+  const caption = active.scoringIndex === undefined ? moveCaption(active.move, view) : `${view.players.find((player) => player.id === active.move.playerId)?.name ?? 'Player'} · card ${active.move.slot + 1}: power → ${active.move.type === 'replace' && active.move.incoming?.kind === 'number' ? active.move.incoming.value : 'number'} for scoring`
+  return createPortal(<div className={`card-motion-layer${landed ? ' card-motion-landed' : ''}`} data-motion-kind={active.scoringIndex === undefined ? active.move.type : 'scoring'}>
+    <div className="card-motion-table" ref={movingTable}>
     <svg className="card-motion-paths" aria-hidden="true">
       <defs><marker id={arrowId} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" /></marker></defs>
       {geometry.flights.map((flight, index) => {
@@ -204,6 +198,7 @@ export function CardMotion({ view, viewerId, tableRef, onAnimatingChange }: Card
     </svg>
     {geometry.flights.map((flight, index) => <div key={`${active.id}-${index}`} className="card-motion-card" ref={(element) => { flyingCards.current[index] = element }} style={{ width: flight.from.width, height: flight.from.height, transform: `translate3d(${flight.from.x}px, ${flight.from.y}px, 0)` }} aria-hidden="true"><Card card={flight.card ?? undefined} faceUp={flight.card !== null} /></div>)}
     {geometry.labels.map((label, index) => <span key={index} className="card-motion-position" style={{ left: Math.max(68, Math.min(document.documentElement.clientWidth - 68, label.box.x + label.box.width / 2)), top: label.box.y + label.box.height + 7 }} aria-hidden="true">{label.text}</span>)}
-    <div className="card-motion-caption" role="status" aria-live="polite"><span aria-hidden="true">{active.move.type === 'swap' ? '⇄' : '↔'}</span><span>{active.caption}</span></div>
+    </div>
+    <div className="card-motion-caption" role="status" aria-live="polite"><span aria-hidden="true">{active.move.type === 'swap' ? '⇄' : '↔'}</span><span>{caption}</span></div>
   </div>, document.body)
 }

@@ -8,12 +8,13 @@ import {
 import type { RoomCredentials, RoomRequest, RoomView } from '../game/room-types'
 import type { DispatchResult, GameSession } from '../game/session'
 import type { GameAction } from '../game/types'
+import type { ReactionId } from '../game/reactions'
 import { Icon } from './Icon'
 
 interface OnlineRoomProps {
   onBack: () => void
   onRules: () => void
-  renderGame: (session: GameSession, room: RoomView, onLeave: () => void) => ReactNode
+  renderGame: (session: GameSession, room: RoomView, onLeave: () => void, onReaction: (imageId: ReactionId) => Promise<DispatchResult>) => ReactNode
 }
 
 type Connection = 'connecting' | 'online' | 'offline'
@@ -190,7 +191,7 @@ export function OnlineRoom({ onBack, onRules, renderGame }: OnlineRoomProps) {
     }
   }
 
-  async function mutate(operation: 'start' | 'leave' | 'action', action?: GameAction): Promise<DispatchResult> {
+  async function mutate(operation: 'start' | 'leave' | 'action' | 'react', action?: GameAction, imageId?: ReactionId): Promise<DispatchResult> {
     const seat = credentialsRef.current
     const current = roomRef.current
     if (!seat || !current) return { ok: false, error: 'The room is still connecting.' }
@@ -202,6 +203,7 @@ export function OnlineRoom({ onBack, onRules, renderGame }: OnlineRoomProps) {
     mutationController.current = controller
     const request: RoomRequest = operation === 'action' && action
       ? { operation: 'action', ...seat, revision: current.revision, action }
+      : operation === 'react' && imageId ? { operation: 'react', ...seat, imageId }
       : { operation: operation === 'leave' ? 'leave' : 'start', ...seat }
     try {
       const response = await requestRoom(request, controller.signal)
@@ -257,7 +259,7 @@ export function OnlineRoom({ onBack, onRules, renderGame }: OnlineRoomProps) {
     {copyFallback && <div className="online-connection-notice"><input ref={inviteInput} className="field-input" aria-label="Invite link" readOnly value={getInviteLink(room.code)} onFocus={(event) => event.target.select()} /></div>}
     {connectionError && <div className="online-connection-notice notice error-notice" role="alert">{connectionError} Your seat and latest confirmed game are kept while reconnecting.</div>}
     {error && <div className="online-connection-notice notice error-notice" role="alert">{error}</div>}
-    <fieldset className="online-game-controls" disabled={connection !== 'online'}><legend className="sr-only">Online game</legend>{renderGame(session, room, backFromGame)}</fieldset>
+    <fieldset className="online-game-controls" disabled={connection !== 'online'}><legend className="sr-only">Online game</legend>{renderGame(session, room, backFromGame, (imageId) => mutate('react', undefined, imageId))}</fieldset>
   </>
 
   return <main className="app-shell online-layout">

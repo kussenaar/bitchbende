@@ -8,6 +8,12 @@
 
 .card-motion-hidden > .card { opacity: 0 !important; }
 
+.card-motion-table {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+
 .card-motion-hidden[data-card-slot] {
   border-radius: 8px;
   outline: 3px dashed #ffe4a5;

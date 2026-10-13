@@ -23,6 +23,10 @@ Every round starts with an empty discard pile, so the first player draws from th
 
 Replacements and swaps animate between numbered card positions, with a brief pause before computers continue. Blind swaps stay face down. Position numbers remain visible when choosing a swap, including on phones.
 
+Card flights stay aligned to the table while scrolling, including mobile browser toolbar changes. At round end, remaining power cards are visibly replaced one at a time before the summary. The final match ends with a winner celebration and optional fanfare.
+
+Use **Reactions** above the table to send any of the eight supplied image stickers. Online friends see the image and sender briefly; reactions do not enter Activity or change turns. The rules dialog uses readable text and scrolls independently on mobile.
+
 Activity records actions and player names without keeping card values or positions. Public cards and swap positions are visible as the moves happen, so players need to remember them.
 
 Optional separate processes: `npm run dev:client` and `npm run dev:server`. To test from a phone on the same network, run `npm run dev -- --host 0.0.0.0` and set the room server's `ALLOWED_ORIGIN` to the printed network origin. Internet rooms need the Supabase deployment below.
@@ -34,7 +38,7 @@ npm test
 npm run build
 ```
 
-The engine tests cover the exact 66-card deck, hidden information, every power, turns, final turns, scores, save validation, bot strategy, and complete 2–4-player matches. Room tests cover authentication, safe views, host controls, capacity, expiration, and competing commands. The build also typechecks the server. `npm run preview` previews the production frontend; online play requires its configured room API.
+The engine tests cover the exact 66-card deck, hidden information, every power, turns, final turns, scores, save validation, bot strategy, and complete 2–4-player matches. Room tests cover authentication, safe views, host controls, capacity, expiration, competing commands, and reactions during simultaneous moves. The build also typechecks the server. `npm run preview` previews the production frontend; online play requires its configured room API.
 
 ## Architecture and rules
 

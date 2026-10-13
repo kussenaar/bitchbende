@@ -2,6 +2,7 @@ import { applyAction, createGame, getPlayerView } from '../src/game/engine.ts'
 import type { GameAction, GameState } from '../src/game/types.ts'
 import type { RoomView } from '../src/game/room-types.ts'
 import { secureShuffle } from './shuffle.ts'
+import { isReactionId, REACTION_COOLDOWN_MS, REACTION_LIFETIME_MS, type TableReaction } from '../src/game/reactions.ts'
 
 export interface RoomDocument {
   code: string
@@ -14,6 +15,10 @@ export interface RoomDocument {
   createdAt: string
   updatedAt: string
   expiresAt: string
+  reactions?: TableReaction[]
+  /** Reactions update storage without invalidating an otherwise current move. */
+  gameRoomRevision?: number
+  roundStartRevision?: number
 }
 
 /** Repositories must implement atomic revision comparisons, including deletes. */
@@ -65,7 +70,7 @@ function equalHashes(a: string, b: string): boolean {
   return difference === 0
 }
 
-function view(room: RoomDocument, viewerId: string): RoomView {
+function view(room: RoomDocument, viewerId: string, now: number): RoomView {
   return {
     code: room.code,
     hostId: room.hostId,
@@ -74,6 +79,7 @@ function view(room: RoomDocument, viewerId: string): RoomView {
     players: room.players.map(({ id, name }) => ({ id, name })),
     rounds: room.rounds,
     game: room.game ? getPlayerView(room.game, viewerId) : null,
+    reactions: (room.reactions ?? []).filter((reaction) => reaction.createdAt > now - REACTION_LIFETIME_MS),
   }
 }
 
@@ -93,6 +99,7 @@ function normalizedCode(value: unknown): string | null {
 export function createRoomHandler(repository: RoomRepository, options: RoomHandlerOptions = {}) {
   const allowedOrigins = options.allowedOrigins ?? DEV_ORIGINS
   const now = options.now ?? Date.now
+  const project = (room: RoomDocument, viewerId: string) => view(room, viewerId, now())
 
   return async (request: Request): Promise<Response> => {
     const origin = request.headers.get('origin')
@@ -130,7 +137,7 @@ export function createRoomHandler(repository: RoomRepository, options: RoomHandl
       } catch { return failure('Invalid JSON request.', 400) }
 
       const operation = body.operation
-      if (!['create', 'join', 'view', 'start', 'leave', 'action'].includes(String(operation))) return failure('Unknown room operation.', 400)
+      if (!['create', 'join', 'view', 'start', 'leave', 'action', 'react'].includes(String(operation))) return failure('Unknown room operation.', 400)
       const timestamp = () => new Date(now()).toISOString()
       const expiresAt = () => new Date(now() + ROOM_LIFETIME_MS).toISOString()
       const get = async (code: string) => {
@@ -158,7 +165,7 @@ export function createRoomHandler(repository: RoomRepository, options: RoomHandl
               players: [player], rounds, game: null,
               createdAt: timestamp(), updatedAt: timestamp(), expiresAt: expiresAt(),
             }
-            if (await repository.create(room)) return response({ room: view(room, player.id), playerId: player.id, token })
+            if (await repository.create(room)) return response({ room: project(room, player.id), playerId: player.id, token })
           }
           return failure('Could not create a room. Please try again.', 503)
         }
@@ -173,7 +180,7 @@ export function createRoomHandler(repository: RoomRepository, options: RoomHandl
           if (room.players.length >= 4) return failure('This room already has four players.', 409, 'ROOM_FULL')
           const next = touch({ ...room, players: [...room.players, player] })
           if (await repository.compareAndSwap(code, room.revision, next)) {
-            return response({ room: view(next, player.id), playerId: player.id, token })
+            return response({ room: project(next, player.id), playerId: player.id, token })
           }
         }
         return failure('The room changed while you were joining. Try again.', 409, 'ROOM_CHANGED')
@@ -195,21 +202,45 @@ export function createRoomHandler(repository: RoomRepository, options: RoomHandl
         const latest = await get(code)
         const stillSeated = latest?.players.find((seat) => seat.id === playerId && equalHashes(seat.tokenHash, player.tokenHash))
         return failure('The room changed. Your game has been refreshed; try the move again.', 409, 'STALE_REVISION',
-          latest && stillSeated ? view(latest, playerId) : undefined)
+          latest && stillSeated ? project(latest, playerId) : undefined)
       }
 
-      if (operation === 'view') return response({ room: view(room, playerId) })
+      if (operation === 'view') return response({ room: project(room, playerId) })
+      if (operation === 'react') {
+        if (!isReactionId(body.imageId)) return failure('Choose one of the available reactions.', 400, 'INVALID_REACTION')
+        const reaction: TableReaction = { id: randomHex(12), playerId, imageId: body.imageId, createdAt: now() }
+        let candidate = room
+        for (let attempt = 0; attempt < 8; attempt++) {
+          if (!candidate.game || candidate.status === 'waiting') return failure('Start the game before sending reactions.', 409)
+          const sameSeat = candidate.players.some((seat) => seat.id === playerId && equalHashes(seat.tokenHash, player.tokenHash))
+          if (!sameSeat) return stale()
+          const recent = (candidate.reactions ?? []).filter((entry) => entry.createdAt > now() - REACTION_LIFETIME_MS)
+          if (recent.some((entry) => entry.playerId === playerId && now() - entry.createdAt < REACTION_COOLDOWN_MS)) {
+            return failure('Give your last reaction a moment before sending another.', 429, 'REACTION_COOLDOWN')
+          }
+          const next = touch({
+            ...candidate, reactions: [...recent.slice(-11), reaction],
+            gameRoomRevision: candidate.gameRoomRevision ?? candidate.revision,
+            roundStartRevision: candidate.roundStartRevision ?? (candidate.game.phase === 'initial' ? candidate.revision - candidate.game.players.filter((seat) => seat.ready).length : undefined),
+          })
+          if (await repository.compareAndSwap(code, candidate.revision, next)) return response({ room: project(next, playerId) })
+          const latest = await get(code)
+          if (!latest) return stale()
+          candidate = latest
+        }
+        return stale()
+      }
       if (operation === 'start') {
         if (playerId !== room.hostId) return failure('Only the room creator can start the game.', 403, 'HOST_ONLY')
         if (room.status !== 'waiting') return failure('This game has already started.', 409, 'GAME_STARTED')
         if (room.players.length < 2) return failure('At least two players must join before starting.', 409, 'NEED_PLAYERS')
         const seed = crypto.getRandomValues(new Uint32Array(1))[0]
         const next = touch({
-          ...room, status: 'playing',
+          ...room, status: 'playing', gameRoomRevision: room.revision + 1, roundStartRevision: room.revision + 1,
           game: createGame(room.players.map(({ id, name }) => ({ id, name })), { rounds: room.rounds, seed, shuffle: secureShuffle }),
         })
         if (!await repository.compareAndSwap(code, room.revision, next)) return stale()
-        return response({ room: view(next, playerId) })
+        return response({ room: project(next, playerId) })
       }
       if (operation === 'leave') {
         if (room.status !== 'waiting') {
@@ -221,7 +252,7 @@ export function createRoomHandler(repository: RoomRepository, options: RoomHandl
           ? await repository.compareAndSwap(code, room.revision, next)
           : await repository.delete(code, room.revision)
         if (!saved) return stale()
-        return response({ room: view(next, playerId) })
+        return response({ room: project(next, playerId) })
       }
 
       if (typeof body.revision !== 'number' || !Number.isSafeInteger(body.revision) || body.revision < 0) {
@@ -240,31 +271,45 @@ export function createRoomHandler(repository: RoomRepository, options: RoomHandl
         for (let attempt = 0; attempt < 8; attempt++) {
           const sameSeat = candidate.players.some((seat) => seat.id === playerId && equalHashes(seat.tokenHash, player.tokenHash))
           if (!sameSeat || candidate.status !== 'playing' || candidate.game?.phase !== 'initial') return stale()
-          // Only readiness writes happen during preparation. Their count gives
-          // this round's starting revision, excluding delayed earlier-round
-          // commands that must not cover a new deal before its owner sees it.
-          const roundStartRevision = candidate.revision - candidate.game.players.filter((seat) => seat.ready).length
+          // Track the deal revision independently of reactions. Old rooms can
+          // infer it from readiness writes until their first reaction arrives.
+          // Earlier-round commands must never cover a new, unseen deal.
+          const roundStartRevision = candidate.roundStartRevision ?? candidate.revision - candidate.game.players.filter((seat) => seat.ready).length
           if (body.revision < roundStartRevision) return stale()
           const result = applyAction(candidate.game, playerId, { type: 'ready' }, secureShuffle)
           if (!result.ok) return stale()
-          const next = touch({ ...candidate, game: result.state })
-          if (await repository.compareAndSwap(code, candidate.revision, next)) return response({ room: view(next, playerId) })
+          const next = touch({ ...candidate, game: result.state, gameRoomRevision: candidate.revision + 1, roundStartRevision })
+          if (await repository.compareAndSwap(code, candidate.revision, next)) return response({ room: project(next, playerId) })
           const latest = await get(code)
           if (!latest) return stale()
           candidate = latest
         }
         return stale()
       }
-      if (body.revision !== room.revision) return stale()
-      if (!room.game || room.status !== 'playing') return failure('The game is not in progress.', 409)
-      if ((action as GameAction).type === 'next-round' && playerId !== room.hostId) {
-        return failure('Only the room creator can start the next round.', 403, 'HOST_ONLY')
+      // Retry storage contention only while no game action has changed the
+      // position the sender saw. Reactions must not interrupt a valid turn.
+      let candidate = room
+      for (let attempt = 0; attempt < 8; attempt++) {
+        if (body.revision < (candidate.gameRoomRevision ?? candidate.revision) || body.revision > candidate.revision) return stale()
+        if (!candidate.game || candidate.status !== 'playing') return failure('The game is not in progress.', 409)
+        if ((action as GameAction).type === 'next-round' && playerId !== candidate.hostId) {
+          return failure('Only the room creator can start the next round.', 403, 'HOST_ONLY')
+        }
+        const sameSeat = candidate.players.some((seat) => seat.id === playerId && equalHashes(seat.tokenHash, player.tokenHash))
+        if (!sameSeat) return stale()
+        const result = applyAction(candidate.game, playerId, action as GameAction, secureShuffle)
+        if (!result.ok) return failure(result.error, 400, 'INVALID_ACTION')
+        const next = touch({
+          ...candidate, game: result.state, gameRoomRevision: candidate.revision + 1,
+          ...((action as GameAction).type === 'next-round' ? { roundStartRevision: candidate.revision + 1 } : {}),
+          status: result.state.phase === 'game-over' ? 'finished' : 'playing',
+        })
+        if (await repository.compareAndSwap(code, candidate.revision, next)) return response({ room: project(next, playerId) })
+        const latest = await get(code)
+        if (!latest) return stale()
+        candidate = latest
       }
-      const result = applyAction(room.game, playerId, action as GameAction, secureShuffle)
-      if (!result.ok) return failure(result.error, 400, 'INVALID_ACTION')
-      const next = touch({ ...room, game: result.state, status: result.state.phase === 'game-over' ? 'finished' : 'playing' })
-      if (!await repository.compareAndSwap(code, room.revision, next)) return stale()
-      return response({ room: view(next, playerId) })
+      return stale()
     } catch {
       // Do not serialize database errors or private game state into error responses.
       return failure('The game server could not complete your request. Please try again.', 503, 'SERVER_UNAVAILABLE')

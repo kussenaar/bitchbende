@@ -52,11 +52,18 @@ independent random 256-bit token; only its SHA-256 hash is stored. Sharing a lin
 shares only the room code. All writes compare the stored revision atomically,
 which prevents simultaneous moves, duplicate commands and overfilled lobbies.
 The initial "cover my cards" actions safely retry when different players submit
-them together. Strategic moves always require the exact observed revision.
+them together. Strategic moves require the observed game position; intervening
+reactions can safely retry without accepting stale or duplicate game moves.
 Online deals and recycled decks use fresh cryptographic shuffle entropy, so a
 player cannot search the local engine's seeded RNG to predict hidden cards.
 Only the host starts a game or the next round. Lobby departures transfer the
 host role; active-game seats stay reserved so a player can reconnect.
+
+Authenticated `react` requests accept only image IDs from `src/game/reactions.ts`.
+Recent reactions appear in each seat's safe room projection, expire after ten
+seconds, and stay outside the game state and Activity. Storage keeps at most
+twelve, with a short per-player cooldown. No database migration is needed for
+existing rooms; optional reaction metadata is stored in their JSON document.
 
 No cloud resources are created automatically by the local application. A real
 Supabase project and a frontend deployment are needed for internet play.

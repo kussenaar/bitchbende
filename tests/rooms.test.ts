@@ -6,6 +6,7 @@ import { SupabaseRoomRepository } from '../server/supabase-repository.ts'
 import { isLocalDevOrigin } from '../server/dev-origin.ts'
 import { secureShuffle } from '../server/shuffle.ts'
 import { createDeck } from '../src/game/engine.ts'
+import { REACTION_IMAGES, REACTION_LIFETIME_MS, REACTION_COOLDOWN_MS } from '../src/game/reactions.ts'
 import type { GameAction } from '../src/game/types.ts'
 import type { RoomCredentials, RoomErrorResponse, RoomResponse, RoomView } from '../src/game/room-types.ts'
 
@@ -41,6 +42,95 @@ function setup(options: Parameters<typeof createRoomHandler>[1] = {}) {
   }
   return { repository, handler, send, create, join, read, action }
 }
+
+test('reactions require a valid seat and bundled image, expire, and never change game state or history', async () => {
+  let now = Date.now()
+  const api = setup({ now: () => now })
+  const host = await api.create()
+  const friend = await api.join(host.code)
+  assert.equal((await api.send({ operation: 'react', ...host, imageId: 'reaction-1' })).status, 409)
+  await api.send({ operation: 'start', ...host })
+  const before = await api.read(friend)
+  for (const imageId of ['https://example.com/image.jpg', '../secret', 1, null, 'reaction-9']) {
+    assert.equal((await api.send({ operation: 'react', ...host, imageId })).status, 400)
+  }
+  assert.equal((await api.send({ operation: 'react', ...host, token: 'a'.repeat(64), imageId: 'reaction-1' })).status, 403)
+  for (const image of REACTION_IMAGES) {
+    now += REACTION_COOLDOWN_MS
+    const sent = await api.send({ operation: 'react', ...host, imageId: image.id })
+    assert.equal(sent.status, 200, sent.data.error)
+    const seen = await api.read(friend)
+    assert.equal(seen.reactions.at(-1)?.imageId, image.id)
+    assert.equal(seen.reactions.at(-1)?.playerId, host.playerId)
+    assert.equal(seen.reactions.at(-1)?.createdAt, now)
+    assert.deepEqual(seen.game, before.game, 'Reactions cannot change hands, turn, scoring, game revision, or activity')
+    assert.equal(JSON.stringify(seen).includes(host.token), false)
+  }
+  const tooSoon = await api.send({ operation: 'react', ...host, imageId: 'reaction-1' })
+  assert.equal(tooSoon.status, 429)
+  assert.equal(tooSoon.data.code, 'REACTION_COOLDOWN')
+  now += REACTION_LIFETIME_MS
+  assert.deepEqual((await api.read(friend)).reactions, [])
+})
+
+test('concurrent reactions preserve readiness, valid game moves, and duplicate-action protection', async () => {
+  let now = Date.now()
+  const api = setup({ now: () => now })
+  const host = await api.create()
+  const friend = await api.join(host.code)
+  await api.send({ operation: 'start', ...host })
+  const initial = await api.read(host)
+  const setupResults = await Promise.all([
+    api.send({ operation: 'react', ...host, imageId: 'reaction-1' }),
+    ...[host, friend].map((seat) => api.send({ operation: 'action', ...seat, revision: initial.revision, action: { type: 'ready' } })),
+  ])
+  assert.ok(setupResults.every((result) => result.status === 200), JSON.stringify(setupResults.map((result) => result.data.error)))
+  let room = await api.read(friend)
+  assert.equal(room.game!.phase, 'draw')
+  assert.equal(room.game!.currentPlayerId, friend.playerId)
+  now += REACTION_COOLDOWN_MS
+  // A reaction can arrive after the active player last polled the room.
+  assert.equal((await api.send({ operation: 'react', ...host, imageId: 'reaction-2' })).status, 200)
+  const draw = { operation: 'action', ...friend, revision: room.revision, action: { type: 'draw', source: 'deck' } }
+  const concurrent = await Promise.all([
+    api.send({ operation: 'react', ...friend, imageId: 'reaction-3' }),
+    api.send(draw),
+  ])
+  assert.ok(concurrent.every((result) => result.status === 200), JSON.stringify(concurrent.map((result) => result.data.error)))
+  const after = await api.read(friend)
+  assert.equal(after.game!.deckCount, room.game!.deckCount - 1)
+  assert.equal(after.game!.revision, room.game!.revision + 1)
+  assert.equal(after.reactions.length, 3, 'No concurrent reactions may be lost')
+  assert.equal((await api.send(draw)).status, 409, 'An actual game change still invalidates an old action')
+  now += REACTION_COOLDOWN_MS
+  const duplicates = await Promise.all([1, 2].map(() => api.send({ operation: 'react', ...friend, imageId: 'reaction-4' })))
+  assert.deepEqual(duplicates.map((result) => result.status).sort(), [200, 429])
+  room = await api.read(host)
+  assert.equal(room.game!.drawn, null, 'Reactions do not expose another player’s private draw')
+})
+
+test('reaction history stays bounded and existing rooms without reaction metadata remain playable', async () => {
+  let now = Date.now()
+  const api = setup({ now: () => now })
+  const host = await api.create()
+  const seats = [host, ...await Promise.all(['A', 'B', 'C'].map((name) => api.join(host.code, name)))]
+  await api.send({ operation: 'start', ...host })
+  const old = (await api.repository.get(host.code))!
+  delete old.gameRoomRevision
+  delete old.roundStartRevision
+  assert.equal(await api.repository.compareAndSwap(host.code, old.revision, old), true)
+  const initial = await api.read(host)
+  await api.send({ operation: 'react', ...host, imageId: 'reaction-1' })
+  const covered = await Promise.all(seats.map((seat) => api.send({ operation: 'action', ...seat, revision: initial.revision, action: { type: 'ready' } })))
+  assert.ok(covered.every((result) => result.status === 200))
+  for (let batch = 0; batch < 4; batch++) {
+    now += REACTION_COOLDOWN_MS
+    const sent = await Promise.all(seats.map((seat) => api.send({ operation: 'react', ...seat, imageId: 'reaction-8' })))
+    assert.ok(sent.every((result) => result.status === 200))
+  }
+  assert.equal((await api.read(host)).reactions.length, 12)
+  assert.equal((await api.repository.get(host.code))!.reactions!.length, 12)
+})
 
 test('room creator starts with two humans, and only the creator can start', async () => {
   const api = setup()

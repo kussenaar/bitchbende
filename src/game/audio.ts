@@ -51,3 +51,37 @@ export function playCallSiren() {
   stopCurrent = stop
   return stop
 }
+
+export function playWinFanfare() {
+  if (!soundEnabled || !context || context.state !== 'running') return () => {}
+  stopCurrent?.()
+  const oscillator = context.createOscillator()
+  const gain = context.createGain()
+  const now = context.currentTime
+  oscillator.type = 'triangle'
+  gain.gain.setValueAtTime(0, now)
+  const notes = [523.25, 659.25, 783.99, 1046.5, 783.99, 1046.5]
+  notes.forEach((frequency, index) => {
+    const start = now + index * .2
+    oscillator.frequency.setValueAtTime(frequency, start)
+    gain.gain.setValueAtTime(0, start)
+    gain.gain.linearRampToValueAtTime(.075, start + .025)
+    gain.gain.linearRampToValueAtTime(0, start + (index === 5 ? .65 : .18))
+  })
+  oscillator.connect(gain)
+  gain.connect(context.destination)
+  oscillator.start(now)
+  oscillator.stop(now + 1.7)
+  let stopped = false
+  const stop = () => {
+    if (stopped) return
+    stopped = true
+    oscillator.stop()
+    oscillator.disconnect()
+    gain.disconnect()
+    if (stopCurrent === stop) stopCurrent = undefined
+  }
+  oscillator.onended = stop
+  stopCurrent = stop
+  return stop
+}

@@ -1,0 +1,20 @@
+.table-social { display: flex; justify-content: flex-end; margin: -5px 0 14px; }
+.reaction-toggle { min-height: 44px; gap: 8px; }
+.reaction-toggle > span { font-size: 20px; }
+.reaction-picker { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.reaction-picker button { min-width: 44px; min-height: 44px; aspect-ratio: 1; padding: 5px; background: #f2efdf; border: 2px solid #d5d9c6; border-radius: 12px; cursor: pointer; }
+.reaction-picker button:hover, .reaction-picker button:focus-visible { border-color: #173f35; background: #ffe4a5; }
+.reaction-picker button:disabled { opacity: .5; cursor: wait; }
+.reaction-picker img { width: 100%; height: 100%; object-fit: contain; border-radius: 6px; }
+.reaction-error { color: #a12c26; }
+.reaction-bursts { position: fixed; left: max(16px, env(safe-area-inset-left)); bottom: max(100px, calc(env(safe-area-inset-bottom) + 80px)); z-index: 70; display: flex; align-items: flex-end; gap: 12px; max-width: calc(100vw - 32px); pointer-events: none; }
+.reaction-bubble { width: clamp(100px, 15vw, 180px); display: grid; justify-items: center; gap: 6px; animation: reaction-pop .5s cubic-bezier(.2, 1.5, .5, 1) both; }
+.reaction-bubble img { width: 100%; height: clamp(110px, 23vh, 210px); object-fit: contain; filter: drop-shadow(3px 5px 0 #173f3555); }
+.reaction-bubble > span { max-width: 100%; padding: 4px 12px; border: 2px solid #173f35; border-radius: 20px; background: #ffe4a5; color: #173f35; font-size: 13px; font-weight: 800; overflow-wrap: anywhere; text-align: center; }
+@keyframes reaction-pop { from { opacity: 0; transform: translateY(45px) scale(.2) rotate(-15deg); } to { opacity: 1; transform: translateY(0) scale(1) rotate(-3deg); } }
+@media (max-width: 650px) {
+  .reaction-picker { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .reaction-bubble { width: 105px; }
+  .reaction-bubble img { height: min(150px, 23dvh); }
+}
+@media (prefers-reduced-motion: reduce) { .reaction-bubble { animation: none; } }

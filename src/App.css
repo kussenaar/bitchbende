@@ -921,3 +921,29 @@ button.card:enabled:active { transform: translateY(-2px); }
 .table-selecting-swap .player-seat:not(.is-self) button.card { outline: 2px dashed #ffda75; outline-offset: 3px; }
 .table-selecting-swap .player-seat:not(.is-self) button.card:hover,
 .table-selecting-swap .player-seat:not(.is-self) button.card:focus-visible { outline: 3px solid #ffda75; outline-offset: 4px; }
+
+.round-reveal-progress { display: flex; justify-content: center; align-items: center; gap: 14px; padding: 26px 18px; margin-top: 18px; border: 3px solid #173f35; border-radius: 15px; background: #ffe4a5; box-shadow: 4px 4px 0 #173f35; }
+.round-reveal-progress strong, .round-reveal-progress span { display: block; }
+.round-reveal-progress span { font-size: 13px; margin-top: 5px; }
+
+/* Keep dialog controls visible while long rules scroll at a readable size. */
+.modal-backdrop { grid-template-columns: minmax(0, 1fr); }
+.modal { display: flex; flex-direction: column; min-width: 0; padding: 0; overflow: hidden; max-height: calc(100dvh - 48px); }
+.modal-header { flex: 0 0 auto; padding: 20px 24px 16px; margin: 0; border-bottom: 1px solid var(--line); }
+.modal-header .icon-button { min-width: 44px; min-height: 44px; }
+.modal-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 20px 24px 24px; }
+.modal-wide .modal-body { color: #36493c; }
+.modal-wide .rules-intro, .modal-wide .rule-step p, .modal-wide .power-guide p, .modal-wide .rules-scoring p { font-size: 16px; line-height: 1.65; color: #36493c; }
+.modal-wide .rule-step h3, .modal-wide .power-guide h3, .modal-wide .rules-scoring h3 { font-size: 18px; color: #173f35; }
+.modal-wide .rules-footnote { font-size: 14px; color: #4b604e; }
+.modal-wide .step-number { font-size: 13px; color: #506548; }
+.modal-wide .power-guide h3 small { font-size: 13px; color: #506548; }
+.modal-wide .rules-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 650px) {
+  .modal-backdrop { padding: 12px; }
+  .modal { max-height: calc(100dvh - 24px); padding: 0; }
+  .modal-header { padding: 12px 16px; }
+  .modal-body { padding: 18px 16px 24px; }
+  .modal-wide .rules-grid { grid-template-columns: minmax(0, 1fr); }
+  .modal-wide .rule-step { padding: 16px; }
+}
